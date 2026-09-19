@@ -1,0 +1,14 @@
+// Tool: ledgerlens.trace_failure_point
+// Every span of the disbursal pipeline for one disbursal, failed spans first, then in time order.
+// If the first row has event.outcome == "failure" that span is the failure point.
+// If no row has a failure, the pipeline was clean and the break is not a payment failure.
+// Params: ?disbursal_id (string)
+FROM ledgerlens-traces
+| WHERE labels.disbursal_id == ?disbursal_id
+| EVAL is_failure = CASE(event.outcome == "failure", 1, 0)
+| KEEP @timestamp, trace.id, span.id, parent.id, service.name, span.name, span.type, duration_ms,
+       event.outcome, is_failure, http.response.status_code, error.type, error.message,
+       labels.psp_status, labels.psp_reason, labels.retry_attempt, labels.idempotency_key_present,
+       labels.utr, labels.callback_for_attempt, labels.settlement_cycle, labels.booked_on
+| SORT is_failure DESC, @timestamp ASC
+| LIMIT 50

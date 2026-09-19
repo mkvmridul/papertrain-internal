@@ -1,0 +1,90 @@
+version: "1"
+name: ledgerlens-log-fee-dispute
+description: >
+  FEE_MISMATCH action. Write the overcharge to the monthly fee dispute register as an append-only
+  audit record: charged fee, contracted fee and the difference, all verbatim from ES|QL. No case:
+  a fee dispute is commercial, not operational. Runs only after a human approves in the conversation.
+enabled: true
+tags:
+  - ledgerlens
+  - bfsi
+triggers:
+  - type: manual
+inputs:
+  - name: title
+    type: string
+    required: true
+    description: Register line, e.g. "FEE_MISMATCH · DSB-20260916-00051 · Delta ₹0.00"
+  - name: disbursal_id
+    type: string
+    required: true
+  - name: break_type
+    type: string
+    required: true
+  - name: partner
+    type: string
+    required: true
+    description: Partner name, verbatim from ledgerlens.break_delta
+  - name: rail
+    type: string
+    required: true
+    description: Rail, verbatim from ledgerlens.break_delta (IMPS, NEFT or RTGS)
+  - name: charged_fee_inr
+    type: string
+    required: true
+    description: charged_fee_inr verbatim from ledgerlens.break_delta
+  - name: expected_fee_inr
+    type: string
+    required: true
+    description: expected_fee_inr verbatim from ledgerlens.break_delta
+  - name: fee_delta_inr
+    type: string
+    required: true
+    description: fee_delta_inr verbatim from ledgerlens.break_delta
+  - name: message
+    type: string
+    required: true
+    description: The register entry text, exactly as shown to the reviewer under Draft message
+  - name: report
+    type: string
+    required: true
+    description: The full audit-ready report text produced by the agent
+  - name: approved_by
+    type: string
+    default: ops-analyst
+consts:
+  audit_index: ledgerlens-audit
+outputs:
+  audit_record_id: "{{ steps.write_audit.output._id }}"
+  disbursal_id: "{{ inputs.disbursal_id }}"
+steps:
+  # 1. Append-only register entry in the audit index.
+  - name: write_audit
+    type: elasticsearch.request
+    with:
+      method: POST
+      path: /{{ consts.audit_index }}/_doc?refresh=true
+      body:
+        "@timestamp": "{{ now | date: '%Y-%m-%dT%H:%M:%SZ' }}"
+        action: FEE_DISPUTE_LOGGED
+        disbursal_id: "{{ inputs.disbursal_id }}"
+        break_type: "{{ inputs.break_type }}"
+        partner: "{{ inputs.partner }}"
+        rail: "{{ inputs.rail }}"
+        charged_fee_inr: "{{ inputs.charged_fee_inr }}"
+        expected_fee_inr: "{{ inputs.expected_fee_inr }}"
+        fee_delta_inr: "{{ inputs.fee_delta_inr }}"
+        message: "{{ inputs.message }}"
+        approved_by: "{{ inputs.approved_by }}"
+        execution_id: "{{ execution.id }}"
+        summary: "{{ inputs.title }}"
+
+  # 2. Tell the caller (the agent) what happened, so it can quote the IDs verbatim.
+  - name: done
+    type: console
+    with:
+      message: >
+        FEE_DISPUTE_LOGGED disbursal_id={{ inputs.disbursal_id }} partner={{ inputs.partner }} rail={{ inputs.rail }}
+        charged_fee_inr={{ inputs.charged_fee_inr }} expected_fee_inr={{ inputs.expected_fee_inr }}
+        audit_record_id={{ steps.write_audit.output._id }}
+        execution_id={{ execution.id }}

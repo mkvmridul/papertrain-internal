@@ -1,0 +1,28 @@
+{
+  "mappings": {
+    "dynamic": "strict",
+    "_meta": {
+      "purpose": "Append-only record of every action the agent took through an Elastic Workflow, written by the workflow itself after human approval. One workflow per break type; each writes its own `action` value and only the fields it needs. Figures are stored as keyword because they are passed through verbatim from ES|QL, never re-parsed."
+    },
+    "properties": {
+      "@timestamp":        { "type": "date" },
+      "action":            { "type": "keyword" },
+      "disbursal_id":      { "type": "keyword" },
+      "break_type":        { "type": "keyword" },
+      "case_id":           { "type": "keyword" },
+      "approved_by":       { "type": "keyword" },
+      "execution_id":      { "type": "keyword" },
+      "summary":           { "type": "text" },
+      "partner":           { "type": "keyword" },
+      "rail":              { "type": "keyword" },
+      "utr":               { "type": "keyword" },
+      "amount_inr":        { "type": "keyword" },
+      "settlement_row_id": { "type": "keyword" },
+      "value_date":        { "type": "keyword" },
+      "charged_fee_inr":   { "type": "keyword" },
+      "expected_fee_inr":  { "type": "keyword" },
+      "fee_delta_inr":     { "type": "keyword" },
+      "message":           { "type": "text" }
+    }
+  }
+}

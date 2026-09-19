@@ -1,0 +1,33 @@
+{
+  "mappings": {
+    "dynamic": "strict",
+    "_meta": {
+      "purpose": "Unified reconciliation index: event-sourced ledger events and normalised PSP/bank settlement rows share one schema so a single ES|QL STATS ... BY disbursal_id performs the match with no join.",
+      "keyword_vs_text": "Identifiers, codes and business dates are keyword (exact match, lexical ordering). Only human-written narration/description is text.",
+      "money": "All amounts are integer paise. Never floats."
+    },
+    "properties": {
+      "@timestamp":         { "type": "date" },
+      "source":             { "type": "keyword" },
+      "event_id":           { "type": "keyword" },
+      "row_id":             { "type": "keyword" },
+      "event_type":         { "type": "keyword" },
+      "sequence":           { "type": "integer" },
+      "status":             { "type": "keyword" },
+      "business_date":      { "type": "keyword" },
+      "settlement_date":    { "type": "keyword" },
+      "value_date":         { "type": "keyword" },
+      "disbursal_id":       { "type": "keyword" },
+      "loan_id":            { "type": "keyword" },
+      "customer_id":        { "type": "keyword" },
+      "partner":            { "type": "keyword" },
+      "rail":               { "type": "keyword" },
+      "utr":                { "type": "keyword" },
+      "amount_paise":       { "type": "long" },
+      "expected_fee_paise": { "type": "long" },
+      "fee_paise":          { "type": "long" },
+      "description":        { "type": "text" },
+      "narration":          { "type": "text" }
+    }
+  }
+}

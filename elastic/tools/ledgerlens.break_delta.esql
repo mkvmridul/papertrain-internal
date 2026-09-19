@@ -1,0 +1,62 @@
+// Tool: ledgerlens.break_delta
+// For one disbursal: the exact ledger vs settlement figures, the fee comparison, the rule that fired,
+// and every source ID (ledger event IDs, settlement row IDs, UTRs) so the report can cite them.
+// This is the only place a break is classified. The LLM receives the result verbatim.
+// Scalars used in comparisons (value_date, business_date) are aggregated with MAX so they are single-valued:
+// a comparison on a multivalued field is null in ES|QL and would silently fall through the CASE.
+// Params: ?disbursal_id (string)
+FROM ledgerlens-recon
+| WHERE disbursal_id == ?disbursal_id
+| EVAL is_success = source == "ledger" AND event_type == "DISBURSAL_SUCCEEDED"
+| EVAL l_amt = CASE(is_success, amount_paise, 0),
+       s_amt = CASE(source == "settlement", amount_paise, 0),
+       l_n   = CASE(is_success, 1, 0),
+       s_n   = CASE(source == "settlement", 1, 0),
+       l_fee = CASE(is_success, expected_fee_paise, 0),
+       s_fee = CASE(source == "settlement", fee_paise, 0)
+| STATS ledger_paise        = SUM(l_amt),
+        settled_paise       = SUM(s_amt),
+        ledger_rows         = SUM(l_n),
+        settlement_rows     = SUM(s_n),
+        expected_fee_paise  = SUM(l_fee),
+        charged_fee_paise   = SUM(s_fee),
+        partner             = MAX(partner),
+        rail                = MAX(rail),
+        loan_id             = MAX(loan_id),
+        business_date       = MAX(business_date),
+        value_date          = MAX(value_date),
+        ledger_event_types  = VALUES(event_type),
+        ledger_event_ids    = VALUES(event_id),
+        settlement_row_ids  = VALUES(row_id),
+        utrs                = VALUES(utr)
+  BY disbursal_id
+| EVAL delta_paise = ledger_paise - settled_paise,
+       fee_delta_paise = charged_fee_paise - expected_fee_paise
+| EVAL break_type = CASE(
+        ledger_rows == 0,                                                                  "NO_LEDGER_SUCCESS",
+        settlement_rows == 0,                                                              "MISSING_CREDIT",
+        settlement_rows > 1,                                                               "DOUBLE_DEBIT",
+        delta_paise == 0 AND fee_delta_paise != 0,                                         "FEE_MISMATCH",
+        delta_paise == 0 AND fee_delta_paise == 0 AND value_date > business_date,          "TIMING_T1",
+        delta_paise == 0 AND fee_delta_paise == 0 AND value_date == business_date,         "MATCHED",
+                                                                                           "UNRESOLVED")
+| EVAL rule_fired = CASE(
+        break_type == "NO_LEDGER_SUCCESS", "R-: ledger never booked DISBURSAL_SUCCEEDED for this id; nothing to reconcile",
+        break_type == "MISSING_CREDIT",    "R1: ledger DISBURSAL_SUCCEEDED present AND settlement_rows == 0",
+        break_type == "DOUBLE_DEBIT",      "R2: settlement_rows > 1",
+        break_type == "FEE_MISMATCH",      "R3: delta_paise == 0 AND fee_delta_paise != 0",
+        break_type == "TIMING_T1",         "R4: delta_paise == 0 AND fee_delta_paise == 0 AND value_date > business_date",
+        break_type == "MATCHED",           "R0: delta_paise == 0 AND fee_delta_paise == 0 AND value_date == business_date",
+                                           "R5: no rule matched (settlement_rows == 1, delta_paise != 0); requires human review")
+| EVAL ledger_inr = ledger_paise / 100.0,
+       settled_inr = settled_paise / 100.0,
+       delta_inr = delta_paise / 100.0,
+       expected_fee_inr = expected_fee_paise / 100.0,
+       charged_fee_inr = charged_fee_paise / 100.0,
+       fee_delta_inr = fee_delta_paise / 100.0
+| KEEP disbursal_id, break_type, rule_fired, partner, rail, loan_id, business_date, value_date,
+       ledger_rows, settlement_rows,
+       ledger_paise, settled_paise, delta_paise, expected_fee_paise, charged_fee_paise, fee_delta_paise,
+       ledger_inr, settled_inr, delta_inr, expected_fee_inr, charged_fee_inr, fee_delta_inr,
+       ledger_event_types, ledger_event_ids, settlement_row_ids, utrs
+| LIMIT 1

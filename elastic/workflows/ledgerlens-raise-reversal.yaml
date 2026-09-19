@@ -1,0 +1,108 @@
+version: "1"
+name: ledgerlens-raise-reversal
+description: >
+  DOUBLE_DEBIT action. Open a high-severity case that carries the drafted reversal request to the
+  partner, and write an append-only audit record naming the duplicate UTR to reverse.
+  Runs only after a human approves in the conversation. The agent decides nothing here: every
+  field is passed through verbatim.
+enabled: true
+tags:
+  - ledgerlens
+  - bfsi
+triggers:
+  - type: manual
+inputs:
+  - name: title
+    type: string
+    required: true
+    description: Case title, e.g. "DOUBLE_DEBIT · DSB-20260916-00412 · Delta ₹-2,35,000.00"
+  - name: disbursal_id
+    type: string
+    required: true
+  - name: break_type
+    type: string
+    required: true
+  - name: partner
+    type: string
+    required: true
+    description: Partner name, verbatim from ledgerlens.break_delta, e.g. PAYSTREAM
+  - name: utr
+    type: string
+    required: true
+    description: The UTR of the duplicate settlement row to reverse, verbatim from ledgerlens.evidence_rows
+  - name: delta_inr
+    type: string
+    required: true
+    description: delta_inr verbatim from ledgerlens.break_delta (negative for a double debit)
+  - name: message
+    type: string
+    required: true
+    description: The drafted reversal request to the partner, exactly as shown to the reviewer under Draft message
+  - name: report
+    type: string
+    required: true
+    description: The full audit-ready report text produced by the agent
+  - name: approved_by
+    type: string
+    default: ops-analyst
+consts:
+  audit_index: ledgerlens-audit
+  owner: observability
+outputs:
+  case_id: "{{ steps.create_case.output.case.id | default: 'no-kibana-case' }}"
+  audit_record_id: "{{ steps.write_audit.output._id }}"
+  disbursal_id: "{{ inputs.disbursal_id }}"
+steps:
+  # 1. Kibana case carrying the reversal request. If the project has no Cases app the step fails and we still write the audit record.
+  - name: create_case
+    type: cases.createCase
+    on-failure:
+      continue: true
+    with:
+      title: "{{ inputs.title }}"
+      description: |
+        Reversal request to {{ inputs.partner }} for UTR {{ inputs.utr }}
+
+        {{ inputs.message }}
+
+        ---
+        {{ inputs.report }}
+      owner: "{{ consts.owner }}"
+      severity: high
+      tags:
+        - ledgerlens
+        - reversal
+        - "{{ inputs.break_type }}"
+        - "{{ inputs.disbursal_id }}"
+      settings:
+        syncAlerts: false
+
+  # 2. Append-only audit record. This always runs.
+  - name: write_audit
+    type: elasticsearch.request
+    with:
+      method: POST
+      path: /{{ consts.audit_index }}/_doc?refresh=true
+      body:
+        "@timestamp": "{{ now | date: '%Y-%m-%dT%H:%M:%SZ' }}"
+        action: REVERSAL_REQUESTED
+        disbursal_id: "{{ inputs.disbursal_id }}"
+        break_type: "{{ inputs.break_type }}"
+        partner: "{{ inputs.partner }}"
+        utr: "{{ inputs.utr }}"
+        amount_inr: "{{ inputs.delta_inr }}"
+        message: "{{ inputs.message }}"
+        case_id: "{{ steps.create_case.output.case.id | default: 'no-kibana-case' }}"
+        approved_by: "{{ inputs.approved_by }}"
+        execution_id: "{{ execution.id }}"
+        summary: "{{ inputs.title }}"
+
+  # 3. Tell the caller (the agent) what happened, so it can quote the IDs verbatim.
+  - name: done
+    type: console
+    with:
+      message: >
+        REVERSAL_REQUESTED disbursal_id={{ inputs.disbursal_id }} partner={{ inputs.partner }} utr={{ inputs.utr }}
+        case_id={{ steps.create_case.output.case.id | default: 'no-kibana-case' }}
+        audit_record_id={{ steps.write_audit.output._id }}
+        execution_id={{ execution.id }}

@@ -1,0 +1,19 @@
+{
+  "name": "ledgerlens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Explainable reconciliation-break investigation agent on Elastic Agent Builder. The model explains, ES|QL decides, every number is traceable.",
+  "type": "module",
+  "engines": { "node": ">=20.6" },
+  "scripts": {
+    "generate": "node src/generate.js",
+    "ingest": "node --env-file=.env src/ingest.js",
+    "verify": "node --env-file=.env src/verify.js",
+    "verify:report": "node --env-file=.env src/verify.js --report",
+    "setup:agent": "node --env-file=.env src/setup-agent.js",
+    "console": "node --env-file=.env src/console/server.js",
+    "test": "node --test tests/*.test.js",
+    "all": "npm run generate && npm run ingest && npm run verify && npm run setup:agent"
+  },
+  "license": "MIT"
+}

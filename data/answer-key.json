@@ -1,0 +1,478 @@
+{
+  "generator": "src/generate.js",
+  "seed": 20260916,
+  "generated_at": "2026-09-18T16:10:42.905Z",
+  "business_days": [
+    "2026-09-14",
+    "2026-09-15",
+    "2026-09-16"
+  ],
+  "demo_business_date": "2026-09-16",
+  "rate_card_paise": {
+    "IMPS": 590,
+    "NEFT": 295,
+    "RTGS": 2360
+  },
+  "counts": {
+    "2026-09-14": {
+      "disbursals": 5000,
+      "succeeded": 4919,
+      "failed": 81,
+      "ledger_events": 10000,
+      "settlement_rows": 4919,
+      "spans": 24922,
+      "breaks": 2
+    },
+    "2026-09-15": {
+      "disbursals": 5000,
+      "succeeded": 4889,
+      "failed": 111,
+      "ledger_events": 10000,
+      "settlement_rows": 4889,
+      "spans": 24889,
+      "breaks": 2
+    },
+    "2026-09-16": {
+      "disbursals": 5000,
+      "succeeded": 4903,
+      "failed": 97,
+      "ledger_events": 10000,
+      "settlement_rows": 4902,
+      "spans": 24910,
+      "breaks": 10
+    },
+    "totals": {
+      "disbursals": 15000,
+      "succeeded": 14711,
+      "failed": 289,
+      "ledger_events": 30000,
+      "settlement_rows": 14710,
+      "spans": 74721,
+      "breaks": 14,
+      "resolved_cases": 84
+    }
+  },
+  "breaks": [
+    {
+      "disbursal_id": "DSB-20260914-02747",
+      "business_date": "2026-09-14",
+      "break_type": "MISSING_CREDIT",
+      "variant": "BENEFICIARY_ACCOUNT_INVALID",
+      "partner": "PAYSTREAM",
+      "rail": "IMPS",
+      "loan_id": "LN-31273961",
+      "amount_paise": 38070000,
+      "ledger_utr": "PAYS2026091407288400",
+      "settlement_utrs": [],
+      "settlement_row_ids": [],
+      "expected": {
+        "settlement_rows": 0,
+        "ledger_paise": 38070000,
+        "settled_paise": 0,
+        "delta_paise": 38070000,
+        "expected_fee_paise": 590,
+        "charged_fee_paise": 0,
+        "fee_delta_paise": -590,
+        "value_date": null
+      },
+      "failure_spans": [
+        "psp.callback PAYSTREAM",
+        "psp.status-poll PAYSTREAM"
+      ],
+      "root_cause": "Ledger booked DISBURSAL_SUCCEEDED on the PSP's synchronous ACCEPTED, before a terminal callback. The transfer later FAILED at the destination bank (beneficiary account invalid). No funds left the nodal account."
+    },
+    {
+      "disbursal_id": "DSB-20260914-03063",
+      "business_date": "2026-09-14",
+      "break_type": "DOUBLE_DEBIT",
+      "variant": "RETRY_WITHOUT_IDEMPOTENCY_KEY",
+      "partner": "MERIDIAN",
+      "rail": "NEFT",
+      "loan_id": "LN-32743091",
+      "amount_paise": 22860000,
+      "ledger_utr": "MRDN2026091436159158",
+      "settlement_utrs": [
+        "MRDN2026091448319682",
+        "MRDN2026091436159158"
+      ],
+      "settlement_row_ids": [
+        "STL-20260914-MRDN-0994",
+        "STL-20260914-MRDN-0995"
+      ],
+      "expected": {
+        "settlement_rows": 2,
+        "ledger_paise": 22860000,
+        "settled_paise": 45720000,
+        "delta_paise": -22860000,
+        "expected_fee_paise": 295,
+        "charged_fee_paise": 590,
+        "fee_delta_paise": 295,
+        "value_date": "2026-09-14"
+      },
+      "failure_spans": [
+        "psp.transfer MERIDIAN"
+      ],
+      "root_cause": "Gateway timed out on attempt 1 (HTTP 504) and the retry was sent without an idempotency key. Both attempts were executed by the partner: two UTRs, two settlement rows, one ledger success."
+    },
+    {
+      "disbursal_id": "DSB-20260915-00770",
+      "business_date": "2026-09-15",
+      "break_type": "FEE_MISMATCH",
+      "variant": "WRONG_RAIL_SLAB",
+      "partner": "PAYSTREAM",
+      "rail": "NEFT",
+      "loan_id": "LN-09989821",
+      "amount_paise": 46820000,
+      "ledger_utr": "PAYS2026091574123157",
+      "settlement_utrs": [
+        "PAYS2026091574123157"
+      ],
+      "settlement_row_ids": [
+        "STL-20260915-PAYS-0258"
+      ],
+      "expected": {
+        "settlement_rows": 1,
+        "ledger_paise": 46820000,
+        "settled_paise": 46820000,
+        "delta_paise": 0,
+        "expected_fee_paise": 295,
+        "charged_fee_paise": 590,
+        "fee_delta_paise": 295,
+        "value_date": "2026-09-15"
+      },
+      "failure_spans": [],
+      "root_cause": "Partner charged the IMPS slab (₹5.90) on a NEFT transfer contracted at ₹2.95. Principal matched; pipeline clean. Commercial fee dispute, not a payment failure."
+    },
+    {
+      "disbursal_id": "DSB-20260915-01255",
+      "business_date": "2026-09-15",
+      "break_type": "TIMING_T1",
+      "variant": "AFTER_SETTLEMENT_CUTOFF",
+      "partner": "PAYSTREAM",
+      "rail": "IMPS",
+      "loan_id": "LN-80055524",
+      "amount_paise": 10020000,
+      "ledger_utr": "PAYS2026091563814494",
+      "settlement_utrs": [
+        "PAYS2026091563814494"
+      ],
+      "settlement_row_ids": [
+        "STL-20260916-PAYS-0001"
+      ],
+      "expected": {
+        "settlement_rows": 1,
+        "ledger_paise": 10020000,
+        "settled_paise": 10020000,
+        "delta_paise": 0,
+        "expected_fee_paise": 590,
+        "charged_fee_paise": 590,
+        "fee_delta_paise": 0,
+        "value_date": "2026-09-16"
+      },
+      "failure_spans": [],
+      "root_cause": "Transfer initiated at 23:20 IST, after the partner's 23:00 settlement cut-off. Credit is present in the 2026-09-16 settlement file with value date 2026-09-16. Self-clearing; no action."
+    },
+    {
+      "disbursal_id": "DSB-20260916-00603",
+      "business_date": "2026-09-16",
+      "break_type": "MISSING_CREDIT",
+      "variant": "INSUFFICIENT_NODAL_BALANCE",
+      "partner": "PAYSTREAM",
+      "rail": "NEFT",
+      "loan_id": "LN-50294577",
+      "amount_paise": 6410000,
+      "ledger_utr": "PAYS2026091688231952",
+      "settlement_utrs": [],
+      "settlement_row_ids": [],
+      "expected": {
+        "settlement_rows": 0,
+        "ledger_paise": 6410000,
+        "settled_paise": 0,
+        "delta_paise": 6410000,
+        "expected_fee_paise": 295,
+        "charged_fee_paise": 0,
+        "fee_delta_paise": -295,
+        "value_date": null
+      },
+      "failure_spans": [
+        "psp.callback PAYSTREAM",
+        "psp.status-poll PAYSTREAM"
+      ],
+      "root_cause": "Ledger booked DISBURSAL_SUCCEEDED on the PSP's synchronous ACCEPTED, before a terminal callback. The transfer later FAILED because the nodal account had insufficient balance at execution time. No funds left the nodal account."
+    },
+    {
+      "disbursal_id": "DSB-20260916-01310",
+      "business_date": "2026-09-16",
+      "break_type": "TIMING_T1",
+      "variant": "AFTER_SETTLEMENT_CUTOFF",
+      "partner": "PAYSTREAM",
+      "rail": "NEFT",
+      "loan_id": "LN-93482088",
+      "amount_paise": 3030000,
+      "ledger_utr": "PAYS2026091601073326",
+      "settlement_utrs": [
+        "PAYS2026091601073326"
+      ],
+      "settlement_row_ids": [
+        "STL-20260917-PAYS-0001"
+      ],
+      "expected": {
+        "settlement_rows": 1,
+        "ledger_paise": 3030000,
+        "settled_paise": 3030000,
+        "delta_paise": 0,
+        "expected_fee_paise": 295,
+        "charged_fee_paise": 295,
+        "fee_delta_paise": 0,
+        "value_date": "2026-09-17"
+      },
+      "failure_spans": [],
+      "root_cause": "Transfer initiated at 23:26 IST, after the partner's 23:00 settlement cut-off. Credit is present in the 2026-09-17 settlement file with value date 2026-09-17. Self-clearing; no action."
+    },
+    {
+      "disbursal_id": "DSB-20260916-01624",
+      "business_date": "2026-09-16",
+      "break_type": "TIMING_T1",
+      "variant": "AFTER_SETTLEMENT_CUTOFF",
+      "partner": "NORTHBANK",
+      "rail": "IMPS",
+      "loan_id": "LN-45282658",
+      "amount_paise": 46670000,
+      "ledger_utr": "NRTH2026091691891525",
+      "settlement_utrs": [
+        "NRTH2026091691891525"
+      ],
+      "settlement_row_ids": [
+        "STL-20260917-NRTH-0001"
+      ],
+      "expected": {
+        "settlement_rows": 1,
+        "ledger_paise": 46670000,
+        "settled_paise": 46670000,
+        "delta_paise": 0,
+        "expected_fee_paise": 590,
+        "charged_fee_paise": 590,
+        "fee_delta_paise": 0,
+        "value_date": "2026-09-17"
+      },
+      "failure_spans": [],
+      "root_cause": "Transfer initiated at 23:03 IST, after the partner's 23:00 settlement cut-off. Credit is present in the 2026-09-17 settlement file with value date 2026-09-17. Self-clearing; no action."
+    },
+    {
+      "disbursal_id": "DSB-20260916-02601",
+      "business_date": "2026-09-16",
+      "break_type": "UNRESOLVED",
+      "variant": "SHORT_CREDIT_NO_SIGNAL",
+      "partner": "NORTHBANK",
+      "rail": "RTGS",
+      "loan_id": "LN-28863992",
+      "amount_paise": 291550000,
+      "ledger_utr": "NRTH2026091607619032",
+      "settlement_utrs": [
+        "NRTH2026091607619032"
+      ],
+      "settlement_row_ids": [
+        "STL-20260916-NRTH-0874"
+      ],
+      "expected": {
+        "settlement_rows": 1,
+        "ledger_paise": 291550000,
+        "settled_paise": 291450000,
+        "delta_paise": 100000,
+        "expected_fee_paise": 2360,
+        "charged_fee_paise": 2360,
+        "fee_delta_paise": 0,
+        "value_date": "2026-09-16"
+      },
+      "failure_spans": [],
+      "root_cause": "Unknown by design. Settlement credit is ₹1,000.00 short with a single row, correct fee, correct value date and a clean pipeline. No rule matches and no evidence in the indexed data explains the shortfall. Must escalate to a human with the partner."
+    },
+    {
+      "disbursal_id": "DSB-20260916-02632",
+      "business_date": "2026-09-16",
+      "break_type": "DOUBLE_DEBIT",
+      "variant": "RETRY_WITHOUT_IDEMPOTENCY_KEY",
+      "partner": "NORTHBANK",
+      "rail": "IMPS",
+      "loan_id": "LN-45486284",
+      "amount_paise": 42090000,
+      "ledger_utr": "NRTH2026091675350741",
+      "settlement_utrs": [
+        "NRTH2026091629853757",
+        "NRTH2026091675350741"
+      ],
+      "settlement_row_ids": [
+        "STL-20260916-NRTH-0885",
+        "STL-20260916-NRTH-0886"
+      ],
+      "expected": {
+        "settlement_rows": 2,
+        "ledger_paise": 42090000,
+        "settled_paise": 84180000,
+        "delta_paise": -42090000,
+        "expected_fee_paise": 590,
+        "charged_fee_paise": 1180,
+        "fee_delta_paise": 590,
+        "value_date": "2026-09-16"
+      },
+      "failure_spans": [
+        "psp.transfer NORTHBANK"
+      ],
+      "root_cause": "Gateway timed out on attempt 1 (HTTP 504) and the retry was sent without an idempotency key. Both attempts were executed by the partner: two UTRs, two settlement rows, one ledger success."
+    },
+    {
+      "disbursal_id": "DSB-20260916-02781",
+      "business_date": "2026-09-16",
+      "break_type": "DOUBLE_DEBIT",
+      "variant": "RETRY_WITHOUT_IDEMPOTENCY_KEY",
+      "partner": "NORTHBANK",
+      "rail": "IMPS",
+      "loan_id": "LN-60374513",
+      "amount_paise": 29910000,
+      "ledger_utr": "NRTH2026091652418504",
+      "settlement_utrs": [
+        "NRTH2026091673250261",
+        "NRTH2026091652418504"
+      ],
+      "settlement_row_ids": [
+        "STL-20260916-NRTH-0934",
+        "STL-20260916-NRTH-0935"
+      ],
+      "expected": {
+        "settlement_rows": 2,
+        "ledger_paise": 29910000,
+        "settled_paise": 59820000,
+        "delta_paise": -29910000,
+        "expected_fee_paise": 590,
+        "charged_fee_paise": 1180,
+        "fee_delta_paise": 590,
+        "value_date": "2026-09-16"
+      },
+      "failure_spans": [
+        "psp.transfer NORTHBANK"
+      ],
+      "root_cause": "Gateway timed out on attempt 1 (HTTP 504) and the retry was sent without an idempotency key. Both attempts were executed by the partner: two UTRs, two settlement rows, one ledger success."
+    },
+    {
+      "disbursal_id": "DSB-20260916-02872",
+      "business_date": "2026-09-16",
+      "break_type": "MISSING_CREDIT",
+      "variant": "BENEFICIARY_ACCOUNT_INVALID",
+      "partner": "PAYSTREAM",
+      "rail": "IMPS",
+      "loan_id": "LN-24587288",
+      "amount_paise": 20950000,
+      "ledger_utr": "PAYS2026091688594870",
+      "settlement_utrs": [],
+      "settlement_row_ids": [],
+      "expected": {
+        "settlement_rows": 0,
+        "ledger_paise": 20950000,
+        "settled_paise": 0,
+        "delta_paise": 20950000,
+        "expected_fee_paise": 590,
+        "charged_fee_paise": 0,
+        "fee_delta_paise": -590,
+        "value_date": null
+      },
+      "failure_spans": [
+        "psp.callback PAYSTREAM",
+        "psp.status-poll PAYSTREAM"
+      ],
+      "root_cause": "Ledger booked DISBURSAL_SUCCEEDED on the PSP's synchronous ACCEPTED, before a terminal callback. The transfer later FAILED at the destination bank (beneficiary account invalid). No funds left the nodal account."
+    },
+    {
+      "disbursal_id": "DSB-20260916-03050",
+      "business_date": "2026-09-16",
+      "break_type": "FEE_MISMATCH",
+      "variant": "WRONG_RAIL_SLAB",
+      "partner": "PAYSTREAM",
+      "rail": "NEFT",
+      "loan_id": "LN-04852517",
+      "amount_paise": 28340000,
+      "ledger_utr": "PAYS2026091689528154",
+      "settlement_utrs": [
+        "PAYS2026091689528154"
+      ],
+      "settlement_row_ids": [
+        "STL-20260916-PAYS-0990"
+      ],
+      "expected": {
+        "settlement_rows": 1,
+        "ledger_paise": 28340000,
+        "settled_paise": 28340000,
+        "delta_paise": 0,
+        "expected_fee_paise": 295,
+        "charged_fee_paise": 590,
+        "fee_delta_paise": 295,
+        "value_date": "2026-09-16"
+      },
+      "failure_spans": [],
+      "root_cause": "Partner charged the IMPS slab (₹5.90) on a NEFT transfer contracted at ₹2.95. Principal matched; pipeline clean. Commercial fee dispute, not a payment failure."
+    },
+    {
+      "disbursal_id": "DSB-20260916-03582",
+      "business_date": "2026-09-16",
+      "break_type": "MISSING_CREDIT",
+      "variant": "BENEFICIARY_ACCOUNT_INVALID",
+      "partner": "NORTHBANK",
+      "rail": "RTGS",
+      "loan_id": "LN-47958801",
+      "amount_paise": 433920000,
+      "ledger_utr": "NRTH2026091603942692",
+      "settlement_utrs": [],
+      "settlement_row_ids": [],
+      "expected": {
+        "settlement_rows": 0,
+        "ledger_paise": 433920000,
+        "settled_paise": 0,
+        "delta_paise": 433920000,
+        "expected_fee_paise": 2360,
+        "charged_fee_paise": 0,
+        "fee_delta_paise": -2360,
+        "value_date": null
+      },
+      "failure_spans": [
+        "psp.callback NORTHBANK",
+        "psp.status-poll NORTHBANK"
+      ],
+      "root_cause": "Ledger booked DISBURSAL_SUCCEEDED on the PSP's synchronous ACCEPTED, before a terminal callback. The transfer later FAILED at the destination bank (beneficiary account invalid). No funds left the nodal account."
+    },
+    {
+      "disbursal_id": "DSB-20260916-04312",
+      "business_date": "2026-09-16",
+      "break_type": "FEE_MISMATCH",
+      "variant": "GST_APPLIED_TWICE",
+      "partner": "NORTHBANK",
+      "rail": "IMPS",
+      "loan_id": "LN-55973115",
+      "amount_paise": 19770000,
+      "ledger_utr": "NRTH2026091658384971",
+      "settlement_utrs": [
+        "NRTH2026091658384971"
+      ],
+      "settlement_row_ids": [
+        "STL-20260916-NRTH-1422"
+      ],
+      "expected": {
+        "settlement_rows": 1,
+        "ledger_paise": 19770000,
+        "settled_paise": 19770000,
+        "delta_paise": 0,
+        "expected_fee_paise": 590,
+        "charged_fee_paise": 680,
+        "fee_delta_paise": 90,
+        "value_date": "2026-09-16"
+      },
+      "failure_spans": [],
+      "root_cause": "Partner applied GST twice on the IMPS fee (₹6.80 charged vs ₹5.90 contracted). Principal matched; pipeline clean. Commercial fee dispute, not a payment failure."
+    }
+  ],
+  "break_type_definitions": {
+    "MISSING_CREDIT": "Ledger has DISBURSAL_SUCCEEDED, settlement file has zero rows for the disbursal.",
+    "DOUBLE_DEBIT": "Settlement file has more than one row for the disbursal.",
+    "FEE_MISMATCH": "Principal matches, one row, but charged fee differs from the contracted rate card.",
+    "TIMING_T1": "Principal and fee match, one row, but value date is after the business date.",
+    "UNRESOLVED": "Exactly one row and a non-zero principal delta that no rule explains. Requires human review."
+  }
+}

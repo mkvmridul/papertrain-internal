@@ -1,0 +1,79 @@
+version: "1"
+name: ledgerlens-close-timing
+description: >
+  TIMING_T1 action. Close the break as self-clearing: write an append-only audit record that cites
+  the next-day settlement row and its value date, both verbatim from ES|QL. No case. Runs only after
+  a human approves in the conversation.
+enabled: true
+tags:
+  - ledgerlens
+  - bfsi
+triggers:
+  - type: manual
+inputs:
+  - name: title
+    type: string
+    required: true
+    description: Closing line, e.g. "TIMING_T1 · DSB-20260916-00380 · Delta ₹0.00"
+  - name: disbursal_id
+    type: string
+    required: true
+  - name: break_type
+    type: string
+    required: true
+  - name: partner
+    type: string
+    required: true
+    description: Partner name, verbatim from ledgerlens.break_delta
+  - name: settlement_row_id
+    type: string
+    required: true
+    description: row_id of the next-day settlement row, verbatim from ledgerlens.evidence_rows
+  - name: value_date
+    type: string
+    required: true
+    description: value_date of that row, verbatim (YYYY-MM-DD)
+  - name: message
+    type: string
+    required: true
+    description: The closing note, exactly as shown to the reviewer under Draft message
+  - name: report
+    type: string
+    required: true
+    description: The full audit-ready report text produced by the agent
+  - name: approved_by
+    type: string
+    default: ops-analyst
+consts:
+  audit_index: ledgerlens-audit
+outputs:
+  audit_record_id: "{{ steps.write_audit.output._id }}"
+  disbursal_id: "{{ inputs.disbursal_id }}"
+steps:
+  # 1. Append-only closing record in the audit index.
+  - name: write_audit
+    type: elasticsearch.request
+    with:
+      method: POST
+      path: /{{ consts.audit_index }}/_doc?refresh=true
+      body:
+        "@timestamp": "{{ now | date: '%Y-%m-%dT%H:%M:%SZ' }}"
+        action: CLOSED_SELF_CLEARING
+        disbursal_id: "{{ inputs.disbursal_id }}"
+        break_type: "{{ inputs.break_type }}"
+        partner: "{{ inputs.partner }}"
+        settlement_row_id: "{{ inputs.settlement_row_id }}"
+        value_date: "{{ inputs.value_date }}"
+        message: "{{ inputs.message }}"
+        approved_by: "{{ inputs.approved_by }}"
+        execution_id: "{{ execution.id }}"
+        summary: "{{ inputs.title }}"
+
+  # 2. Tell the caller (the agent) what happened, so it can quote the IDs verbatim.
+  - name: done
+    type: console
+    with:
+      message: >
+        CLOSED_SELF_CLEARING disbursal_id={{ inputs.disbursal_id }} settlement_row_id={{ inputs.settlement_row_id }} value_date={{ inputs.value_date }}
+        audit_record_id={{ steps.write_audit.output._id }}
+        execution_id={{ execution.id }}

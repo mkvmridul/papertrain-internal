@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LedgerLens History</title>
+<!-- Runs before first paint so a saved theme does not flash the other one. Shares the key with the
+     investigation console, so a reviewer who picked a theme there keeps it here. -->
+<script>try{var t=localStorage.getItem("ledgerlens.theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+<style>
+  /* Tokens are the investigation console's, unchanged, so the two pages read as one product.
+     Radius scale, locked: --r panels/blocks, --r-ctl controls, --r-chip chips and code. */
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --surface: #f7f9fb;
+    --ink: #11151c; --ink-2: #454e5c; --muted: #6b7484; --line: #dfe4ea; --line-2: #eef1f5;
+    --accent: #0b5fb8; --accent-ink: #ffffff; --accent-soft: #e8f1fc;
+    --ok: #146c40; --ok-bg: #e4f4ea; --bad: #a81f18; --bad-bg: #fbe9e7; --warn: #7d5100; --warn-bg: #fdf1d6;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --r: 8px; --r-ctl: 6px; --r-chip: 3px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1016; --panel: #14181f; --surface: #191e27;
+      --ink: #e9ecf2; --ink-2: #b3bbc8; --muted: #8b94a3; --line: #262c37; --line-2: #1e242d;
+      --accent: #63a6ef; --accent-ink: #0a1119; --accent-soft: #16273a;
+      --ok: #62cf8d; --ok-bg: #13301f; --bad: #ff9a90; --bad-bg: #38201d; --warn: #efc266; --warn-bg: #352c13;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1016; --panel: #14181f; --surface: #191e27;
+    --ink: #e9ecf2; --ink-2: #b3bbc8; --muted: #8b94a3; --line: #262c37; --line-2: #1e242d;
+    --accent: #63a6ef; --accent-ink: #0a1119; --accent-soft: #16273a;
+    --ok: #62cf8d; --ok-bg: #13301f; --bad: #ff9a90; --bad-bg: #38201d; --warn: #efc266; --warn-bg: #352c13;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  code, .mono { font-family: var(--mono); }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .dim { color: var(--muted); }
+  a { color: var(--accent); }
+
+  /* ---------------------------------------------------------------- header */
+  header { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 18px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 3; }
+  header h1 { font-size: 16px; font-weight: 650; margin: 0; letter-spacing: -.1px; white-space: nowrap; }
+  header h1 span { color: var(--muted); font-weight: 400; font-size: 12.5px; margin-left: 8px; }
+  header .spacer { flex: 1; }
+  .badge { font-size: 11.5px; padding: 3px 9px; border-radius: var(--r-ctl); border: 1px solid var(--line); color: var(--ink-2); background: var(--surface); white-space: nowrap; text-decoration: none; }
+  a.badge:hover { border-color: var(--accent); color: var(--accent); }
+
+  button { font: inherit; font-size: 13px; padding: 7px 13px; border-radius: var(--r-ctl); border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; transition: background .12s, border-color .12s, transform .06s; }
+  button:hover { border-color: var(--ink-2); }
+  button:active { transform: translateY(1px); }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.theme { font-size: 11.5px; padding: 3px 9px; color: var(--ink-2); background: var(--surface); min-width: 62px; }
+
+  /* ---------------------------------------------------------------- shell and left pane */
+  .shell { display: grid; grid-template-columns: 238px minmax(0, 1fr); align-items: start; }
+  aside { position: sticky; top: 56px; height: calc(100dvh - 56px); border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; overflow: auto; }
+  aside nav { padding: 12px 10px; display: grid; gap: 2px; }
+  .nav { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 4px 8px; width: 100%; text-align: left; border: 0; background: transparent; padding: 9px 11px; border-radius: var(--r-ctl); color: var(--ink-2); }
+  .nav .t { font-size: 13.5px; font-weight: 550; color: var(--ink); }
+  .nav .s { grid-column: 1 / -1; font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+  .nav .n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); }
+  .nav:hover { background: var(--surface); border-color: transparent; }
+  .nav[aria-current="page"] { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+  .nav[aria-current="page"] .t, .nav[aria-current="page"] .n { color: var(--accent); }
+  .nav[aria-current="page"] .t { font-weight: 650; }
+  aside .idx { margin-top: auto; border-top: 1px solid var(--line); padding: 12px 14px 14px; }
+  aside .idx .h { font-size: 10.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 7px; }
+  aside .idx .row { display: flex; align-items: baseline; gap: 8px; font-size: 11.5px; padding: 3px 0; }
+  aside .idx .row .k { font-family: var(--mono); color: var(--ink-2); }
+  aside .idx .row .v { margin-left: auto; font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+  @media (max-width: 860px) {
+    .shell { grid-template-columns: 1fr; }
+    aside { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+    aside nav { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+    .nav .s { display: none; }
+  }
+
+  main { padding: 16px 20px 28px; min-width: 0; }
+  .viewhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+  .viewhead h2 { font-size: 17px; font-weight: 650; margin: 0; letter-spacing: -.2px; }
+  .viewhead p { margin: 0; font-size: 12.5px; color: var(--muted); flex: 1 1 320px; }
+
+  /* ---------------------------------------------------------------- stat strip */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; margin-bottom: 16px; }
+  .kpi { padding: 12px 15px 13px; border-left: 1px solid var(--line-2); }
+  .kpi:first-child { border-left: 0; }
+  .kpi .k { color: var(--muted); font-size: 10.5px; font-weight: 650; letter-spacing: .5px; text-transform: uppercase; }
+  .kpi .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 600; letter-spacing: -.5px; margin-top: 5px; line-height: 1.1; }
+  .kpi .s { color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+  .kpi.good .v { color: var(--ok); }
+  .kpi.warnv .v { color: var(--warn); }
+  .kpi.badv .v { color: var(--bad); }
+
+  /* ---------------------------------------------------------------- panels and tables */
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; margin-bottom: 16px; }
+  .panel > h3 { font-size: 11.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); margin: 0; padding: 11px 14px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .panel > h3 .right { margin-left: auto; font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 12px; font-family: var(--mono); color: var(--ink-2); }
+  .panel .body { padding: 14px; }
+  .tablewrap { overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); font-size: 10.5px; color: var(--muted); font-weight: 650; text-transform: uppercase; letter-spacing: .5px; text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  thead th.r { text-align: right; }
+  tbody td { padding: 9px 12px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.nowrap { white-space: nowrap; }
+  td.money { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
+  td.money.neg { color: var(--bad); }
+  td.money.zero { color: var(--muted); }
+  td.why { min-width: 190px; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); }
+  th.wide, td.wide { width: 34%; }
+  td .figs { margin-top: 5px; font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .id { font-family: var(--mono); font-size: 12.5px; letter-spacing: -.2px; }
+  .party { font-weight: 550; font-size: 13px; }
+  .rail { color: var(--muted); font-size: 11px; font-family: var(--mono); letter-spacing: .2px; }
+  .t { font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+
+  .type { display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: .3px; padding: 2.5px 6px; border-radius: var(--r-chip); background: var(--surface); border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap; }
+  .type.MISSING_CREDIT, .type.DOUBLE_DEBIT { background: var(--bad-bg); color: var(--bad); border-color: transparent; }
+  .type.FEE_MISMATCH { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+  .type.TIMING_T1 { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
+  .type.UNRESOLVED { background: transparent; color: var(--muted); border-style: dashed; }
+
+  .st { display: inline-block; font-size: 11px; font-weight: 650; letter-spacing: .2px; padding: 2.5px 8px; border-radius: var(--r-chip); white-space: nowrap; }
+  .st.open { background: var(--bad-bg); color: var(--bad); }
+  .st.agent { background: var(--accent-soft); color: var(--accent); }
+  .st.human { background: var(--ok-bg); color: var(--ok); }
+
+  code.k { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-chip); padding: 1px 5px; font-size: 11.5px; color: var(--ink-2); }
+
+  /* ---------------------------------------------------------------- filters */
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 11px 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
+  .filters label { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  select, input[type=search], input[type=text] { font: inherit; font-size: 13px; padding: 6px 9px; border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--panel); color: var(--ink); }
+  input::placeholder { color: var(--muted); opacity: 1; }
+  .filters .right { margin-left: auto; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+
+  /* ---------------------------------------------------------------- workflow blocks */
+  .wf { border-bottom: 1px solid var(--line); padding: 15px 16px 17px; }
+  .wf:last-child { border-bottom: 0; }
+  .wf .top { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+  .wf .top .label { font-size: 14.5px; font-weight: 650; }
+  .wf .top .wid { font-family: var(--mono); font-size: 11.5px; color: var(--muted); margin-left: auto; }
+  .wf .meta { margin-top: 7px; font-size: 12px; color: var(--muted); }
+  .wf .chain { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .wf .chain .s { font-family: var(--mono); font-size: 11px; padding: 3px 8px; border-radius: var(--r-chip); background: var(--surface); border: 1px solid var(--line); color: var(--ink-2); }
+  .wf .chain .arrow { color: var(--muted); font-size: 11px; }
+  .wf .split { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 13px; }
+  .wf .col { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 11px 13px; }
+  .wf .col .h { font-size: 10.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 7px; display: flex; align-items: baseline; gap: 7px; }
+  .wf .col .h .c { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; color: var(--ink); }
+  .wf .col.taken .h .c { color: var(--ok); }
+  .wf .col.pending .h .c { color: var(--warn); }
+  .wf .col ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; }
+  .wf .col li { font-size: 12.5px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 7px; }
+  .wf .col .none { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+
+  /* ---------------------------------------------------------------- precedent cards */
+  .cases { display: grid; gap: 1px; background: var(--line-2); }
+  .case { background: var(--panel); padding: 14px 16px 15px; }
+  .case .top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 9px; }
+  .case .top .cid { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+  .case .top .score { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .case .sum { margin: 8px 0 0; font-size: 13.5px; line-height: 1.55; max-width: 84ch; }
+  .case .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 4px 20px; margin-top: 9px; }
+  .case .grid .f { font-size: 12.5px; line-height: 1.5; color: var(--ink-2); }
+  .case .grid .f b { color: var(--muted); font-weight: 650; font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 2px; }
+  .case .foot { margin-top: 9px; font-size: 11.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 14px; }
+
+  /* ---------------------------------------------------------------- timeline */
+  .lanes { display: flex; flex-wrap: wrap; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--line); background: var(--surface); font-size: 11.5px; color: var(--muted); align-items: center; }
+  .lane { display: inline-block; font-size: 10.5px; font-weight: 650; letter-spacing: .3px; padding: 2.5px 7px; border-radius: var(--r-chip); text-transform: uppercase; white-space: nowrap; }
+  .lane.ledger { background: var(--accent-soft); color: var(--accent); }
+  .lane.settlement { background: var(--ok-bg); color: var(--ok); }
+  .lane.pipeline { background: var(--warn-bg); color: var(--warn); }
+  .lane.action { background: var(--bad-bg); color: var(--bad); }
+  .tl { display: grid; }
+  .tl .ev { display: grid; grid-template-columns: 172px 96px minmax(0, 1fr); gap: 12px; padding: 9px 14px; border-bottom: 1px solid var(--line-2); align-items: baseline; }
+  .tl .ev:last-child { border-bottom: 0; }
+  .tl .ev .desc { font-size: 13px; line-height: 1.5; }
+  .tl .ev .ids { margin-top: 3px; font-family: var(--mono); font-size: 11px; color: var(--muted); word-break: break-word; }
+  .tl .ev.fail .desc { color: var(--bad); font-weight: 550; }
+  @media (max-width: 720px) { .tl .ev { grid-template-columns: 1fr; gap: 3px; } }
+
+  /* ---------------------------------------------------------------- states */
+  .empty { padding: 40px 18px 44px; text-align: center; }
+  .empty strong { display: block; font-size: 15px; font-weight: 650; margin-bottom: 6px; }
+  .empty p { margin: 0 auto; max-width: 62ch; font-size: 13px; line-height: 1.6; color: var(--muted); }
+  .err { margin: 0; padding: 13px 15px; background: var(--bad-bg); color: var(--bad); border: 1px solid transparent; border-radius: var(--r); font-size: 13px; line-height: 1.55; }
+  .err code { font-family: var(--mono); font-size: 11.5px; word-break: break-all; }
+  .skel { height: 11px; border-radius: var(--r-chip); background: var(--line-2); }
+  .skel.w1 { width: 62%; } .skel.w2 { width: 38%; } .skel.w3 { width: 84%; }
+  @media (prefers-reduced-motion: no-preference) {
+    .skel { background: linear-gradient(90deg, var(--line-2) 0%, var(--line) 50%, var(--line-2) 100%); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
+  }
+  @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>LedgerLens <span>history</span></h1>
+  <span id="period" class="badge">loading</span>
+  <div class="spacer"></div>
+  <button type="button" class="theme" id="theme"></button>
+  <a class="badge" id="consoleLink" href="/">Investigation console &#8599;</a>
+  <a class="badge" id="kibanaLink" target="_blank" rel="noopener">Kibana &#8599;</a>
+</header>
+
+<div class="shell">
+  <aside>
+    <nav id="nav" aria-label="History views"></nav>
+    <div class="idx">
+      <div class="h">Indices</div>
+      <div id="idx"></div>
+    </div>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const n = (v) => Number(v ?? 0).toLocaleString("en-IN");
+
+/** Money for display: rupee sign and paise dimmed so the magnitude reads first. Digits unchanged. */
+function money(v) {
+  if (v == null) return "<span class=\"dim\">not applicable</span>";
+  const num = Number(v);
+  const s = Math.abs(num).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const cut = s.lastIndexOf(".");
+  return `${num < 0 ? "-" : ""}₹${esc(s.slice(0, cut))}<span class="dim">${esc(s.slice(cut))}</span>`;
+}
+const plain = (v) => (v == null ? "" : "₹" + Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const when = (iso) => (iso ? String(iso).replace("T", " ").replace(/\.\d+Z?$/, "").replace(/Z$/, "") : "");
+const day = (iso) => (iso ? String(iso).slice(0, 10) : "");
+const list = (v) => (Array.isArray(v) ? v : v == null ? [] : [v]);
+function mins(m) {
+  if (m == null) return "";
+  if (m < 60) return `${m}m`;
+  if (m < 2880) return `${Math.floor(m / 60)}h ${m % 60}m`;
+  return `${Math.floor(m / 1440)}d ${Math.round((m % 1440) / 60)}h`;
+}
+
+async function api(path) {
+  const res = await fetch(path);
+  const j = await res.json().catch(() => ({ error: res.statusText }));
+  if (!res.ok) throw new Error(j.error || res.statusText);
+  return j;
+}
+
+// -------------------------------------------------- theme
+
+const THEME_KEY = "ledgerlens.theme";
+const systemDark = () => matchMedia("(prefers-color-scheme: dark)").matches;
+let themeDark = false;
+
+function setTheme(choice) {
+  if (choice) document.documentElement.setAttribute("data-theme", choice);
+  else document.documentElement.removeAttribute("data-theme");
+  try {
+    if (choice) localStorage.setItem(THEME_KEY, choice);
+    else localStorage.removeItem(THEME_KEY);
+  } catch {}
+  themeDark = choice ? choice === "dark" : systemDark();
+  const btn = $("theme");
+  btn.textContent = themeDark ? "Light" : "Dark";
+  btn.title = `Switch to the ${themeDark ? "light" : "dark"} theme`;
+  btn.setAttribute("aria-label", btn.title);
+}
+setTheme(document.documentElement.getAttribute("data-theme"));
+$("theme").addEventListener("click", () => setTheme(themeDark ? "light" : "dark"));
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (!document.documentElement.hasAttribute("data-theme")) setTheme(null);
+});
+
+// -------------------------------------------------- views
+
+const VIEWS = [
+  { id: "audit",      title: "Audit trail",       sub: "Every action a workflow wrote",     head: "What the agent has done so far",
+    blurb: "One append-only record per approved action, written by the Elastic Workflow itself into ledgerlens-audit. Nothing reaches this index without a human approving in the investigation console." },
+  { id: "cases",      title: "Case ledger",       sub: "Resolved against open, with reason", head: "Which breaks are closed, which are not, and why",
+    blurb: "Every break ledgerlens.list_breaks flags, matched against the audit index and the resolved-case library. An open break carries the ES|QL rule that classified it; a closed one carries who closed it and how." },
+  { id: "workflows",  title: "Workflows",         sub: "Taken and not taken",               head: "One workflow per break type",
+    blurb: "The five Elastic Workflows in elastic/workflows, each read from the YAML that actually runs. For each: the steps it executes, the runs it has recorded, and the flagged breaks it is eligible for but has not run on." },
+  { id: "precedents", title: "Precedent library", sub: "Cases a human already resolved",    head: "Resolved cases, with root cause and resolution",
+    blurb: "ledgerlens-resolved-breaks. Searching runs the agent's own hybrid retrieval tool: BM25 on the summary and semantic matching on the same text, fused with reciprocal rank fusion." },
+  { id: "timeline",   title: "Timeline",          sub: "One disbursal, every index",        head: "The full history of one disbursal",
+    blurb: "Ledger events, settlement rows, pipeline spans and approved actions on a single time axis, read from ledgerlens-recon, ledgerlens-traces and ledgerlens-audit." },
+];
+
+let config = null;
+let cache = {};
+
+function renderNav(counts = {}) {
+  $("nav").innerHTML = VIEWS.map((v) => `
+    <button type="button" class="nav" data-view="${v.id}"${v.id === current ? ' aria-current="page"' : ""}>
+      <span class="t">${esc(v.title)}</span>
+      <span class="n">${counts[v.id] ?? ""}</span>
+      <span class="s">${esc(v.sub)}</span>
+    </button>`).join("");
+  for (const b of $("nav").querySelectorAll(".nav")) b.addEventListener("click", () => (location.hash = b.dataset.view));
+}
+
+function viewHead(v, extra = "") {
+  return `<div class="viewhead"><h2>${esc(v.head)}</h2><p>${esc(v.blurb)}</p>${extra}</div>`;
+}
+
+const kpi = (k, v, s, cls = "") => `<div class="kpi ${cls}"><div class="k">${esc(k)}</div><div class="v">${v}</div><div class="s">${esc(s)}</div></div>`;
+const kpis = (cells) => `<section class="kpis">${cells.join("")}</section>`;
+
+function loading(v) {
+  const row = `<tr><td><div class="skel w3"></div></td><td><div class="skel w2"></div></td><td><div class="skel w1"></div></td><td><div class="skel w3"></div></td></tr>`;
+  $("main").innerHTML = viewHead(v) + `<section class="panel"><div class="tablewrap"><table><tbody>${row.repeat(6)}</tbody></table></div></section>`;
+}
+
+function failed(v, e) {
+  $("main").innerHTML = viewHead(v) + `<p class="err"><strong>This view could not load.</strong><br /><code>${esc(e.message)}</code><br />The history console reads Elasticsearch directly. If the indices are being rebuilt by <code>npm run ingest</code>, wait for it to finish and reload.</p>`;
+}
+
+// -------------------------------------------------- view 1: audit trail
+
+function renderAudit(v, d) {
+  const s = d.stats;
+  const head = kpis([
+    kpi("Actions recorded", n(s.records), s.records ? `${day(s.first)} to ${day(s.last)}` : "nothing written yet"),
+    kpi("Disbursals actioned", n(s.disbursals), "distinct disbursal_id"),
+    kpi("Kibana cases opened", n(s.cases), "by cases.createCase"),
+    kpi("Approvers", n(s.approvers.length), s.approvers.length ? s.approvers.join(", ") : "none on record"),
+  ]);
+
+  if (!s.records) {
+    const wf = config.actions.map((a) => `<li><code class="k">${esc(a.audit_action)}</code> <span class="dim">written by</span> <code class="k">${esc(a.workflow_id)}</code> <span class="dim">on approval of a</span> <span class="type ${esc(a.break_type)}">${esc(a.break_type)}</span></li>`).join("");
+    $("main").innerHTML = head + `
+      <section class="panel">
+        <h3>ledgerlens-audit <span class="right">0 records</span></h3>
+        <div class="empty">
+          <strong>No action has been approved yet</strong>
+          <p>This index is append-only and starts empty by design. A record appears the moment a reviewer approves an action in the investigation console and the matching Elastic Workflow runs. Nothing else writes here, so an empty trail means no money-adjacent action has been taken.</p>
+        </div>
+      </section>
+      <section class="panel">
+        <h3>What will be written here</h3>
+        <div class="body"><ul class="wfl" style="margin:0;padding:0;list-style:none;display:grid;gap:7px;font-size:12.5px;line-height:1.6">${wf}</ul></div>
+      </section>`;
+    return;
+  }
+
+  const types = [...new Set(d.rows.map((r) => r.break_type).filter(Boolean))];
+  const opts = (vals) => vals.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  $("main").innerHTML = head + `
+    <section class="panel">
+      <h3>ledgerlens-audit <span class="right">${n(s.records)} records, newest first</span></h3>
+      <div class="filters">
+        <label>Action <select id="fAction"><option value="">All</option>${opts(s.by_action.map((a) => a.action))}</select></label>
+        <label>Break type <select id="fType"><option value="">All</option>${opts(types)}</select></label>
+        <span class="right" id="fCount"></span>
+      </div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Written at</th><th>Action</th><th>Disbursal</th><th>Break</th><th>Partner</th><th>Approved by</th><th>Kibana case</th><th class="wide">Detail</th></tr></thead>
+        <tbody id="auditRows"></tbody>
+      </table></div>
+    </section>`;
+
+  const draw = () => {
+    const fa = $("fAction").value, ft = $("fType").value;
+    const rows = d.rows.filter((r) => (!fa || r.action === fa) && (!ft || r.break_type === ft));
+    $("fCount").textContent = `${rows.length} of ${d.rows.length} shown`;
+    $("auditRows").innerHTML = rows.length ? rows.map((r) => {
+      const amounts = [
+        r.amount_inr != null ? `amount ${esc(r.amount_inr)}` : "",
+        r.charged_fee_inr != null ? `fee charged ${esc(r.charged_fee_inr)} against ${esc(r.expected_fee_inr)}` : "",
+        r.settlement_row_id ? `row ${esc(r.settlement_row_id)}` : "",
+        r.utr ? `UTR ${esc(r.utr)}` : "",
+        r.value_date ? `value date ${esc(r.value_date)}` : "",
+      ].filter(Boolean).join(" · ");
+      return `<tr>
+        <td class="t">${esc(when(r["@timestamp"]))}</td>
+        <td class="nowrap"><code class="k">${esc(r.action)}</code></td>
+        <td class="nowrap"><a class="id" href="#timeline/${esc(r.disbursal_id)}">${esc(r.disbursal_id)}</a></td>
+        <td class="nowrap">${r.break_type ? `<span class="type ${esc(r.break_type)}">${esc(r.break_type)}</span>` : "<span class=\"dim\">none</span>"}</td>
+        <td class="nowrap"><span class="party">${esc(r.partner ?? "")}</span> ${r.rail ? `<span class="rail">${esc(r.rail)}</span>` : ""}</td>
+        <td class="nowrap">${esc(r.approved_by ?? "")}</td>
+        <td class="nowrap">${r.case_id && r.case_id !== "no-kibana-case" ? `<code class="k">${esc(r.case_id)}</code>` : "<span class=\"dim\">none</span>"}</td>
+        <td class="why wide">${r.message ? `<div style="white-space:pre-wrap">${esc(r.message)}</div>` : ""}${amounts ? `<div class="figs">${amounts}</div>` : ""}<div style="margin-top:5px"><code class="k">exec ${esc(r.execution_id ?? "")}</code></div></td>
+      </tr>`;
+    }).join("") : `<tr><td colspan="8"><div class="empty"><strong>No record matches these filters</strong><p>Clear the action or break type filter to see the whole trail.</p></div></td></tr>`;
+  };
+  $("fAction").addEventListener("change", draw);
+  $("fType").addEventListener("change", draw);
+  draw();
+}
+
+// -------------------------------------------------- view 2: case ledger
+
+function renderCases(v, d) {
+  const s = d.stats;
+  const open = d.cases.filter((c) => c.status === "open");
+  const closed = d.cases.filter((c) => c.status !== "open");
+  const head = kpis([
+    kpi("Breaks flagged by ES|QL", n(s.flagged), `${s.business_dates.length} business dates`),
+    kpi("Still open", n(s.open), "no action recorded", s.open ? "badv" : ""),
+    kpi("Closed by the agent", n(s.closed_by_agent), "approved workflow run", s.closed_by_agent ? "good" : ""),
+    kpi("Closed by a human", n(s.closed_by_human), "resolved before LedgerLens", "good"),
+  ]);
+
+  const openRows = open.map((c) => `<tr>
+      <td class="nowrap"><a class="id" href="#timeline/${esc(c.disbursal_id)}">${esc(c.disbursal_id)}</a><div class="t">${esc(c.business_date)}</div></td>
+      <td class="nowrap"><span class="type ${esc(c.break_type)}">${esc(c.break_type)}</span></td>
+      <td class="nowrap"><span class="party">${esc(c.partner)}</span> <span class="rail">${esc(c.rail)}</span></td>
+      <td class="money ${Number(c.delta_inr) === 0 ? "zero" : Number(c.delta_inr) < 0 ? "neg" : ""}">${money(c.delta_inr)}</td>
+      <td class="why">${esc(c.rule_fired ?? "classification unavailable")}</td>
+      <td class="nowrap">${c.eligible_action ? `${esc(c.eligible_action.label)}<div class="t">${esc(c.eligible_action.workflow_id)}</div>` : "<span class=\"dim\">no action defined</span>"}</td>
+      <td class="nowrap"><span class="st open">Open</span></td>
+    </tr>`).join("");
+
+  const closedRows = closed.map((c) => {
+    const a = c.agent_actions[0];
+    const h = c.human_case;
+    const by = a ? `<span class="st agent">Agent workflow</span>` : `<span class="st human">Human analyst</span>`;
+    const who = a ? `${esc(a.approved_by ?? "")} approved` : `${esc(h.resolved_by ?? "")}`;
+    const at = a ? when(a["@timestamp"]) : when(h.resolved_at);
+    const why = a ? esc(a.summary ?? a.action) : esc(h.root_cause ?? "");
+    const did = a ? `<code class="k">${esc(a.action)}</code>${a.case_id && a.case_id !== "no-kibana-case" ? ` <code class="k">${esc(a.case_id)}</code>` : ""}` : esc(h.resolution ?? "");
+    return `<tr>
+      <td class="nowrap"><a class="id" href="#timeline/${esc(c.disbursal_id)}">${esc(c.disbursal_id)}</a><div class="t">${esc(c.business_date)}</div></td>
+      <td class="nowrap"><span class="type ${esc(c.break_type)}">${esc(c.break_type)}</span></td>
+      <td class="nowrap">${by}<div class="t">${who}</div></td>
+      <td class="t">${esc(at)}</td>
+      <td class="why">${why}</td>
+      <td class="why">${did}</td>
+      <td class="nowrap num">${h ? esc(mins(h.time_to_resolve_minutes)) : "<span class=\"dim\">not recorded</span>"}</td>
+    </tr>`;
+  }).join("");
+
+  const bench = d.benchmarks.map((b) => `<tr>
+      <td class="nowrap"><span class="type ${esc(b.break_type)}">${esc(b.break_type)}</span></td>
+      <td class="money">${n(b.cases)}</td>
+      <td class="money">${esc(mins(Math.round(b.median_minutes)))}</td>
+      <td class="money">${esc(mins(Math.round(b.p90_minutes)))}</td>
+      <td class="nowrap num">${n(d.cases.filter((c) => c.break_type === b.break_type && c.status === "open").length)}</td>
+    </tr>`).join("");
+
+  $("main").innerHTML = head + `
+    <section class="panel">
+      <h3>Open <span class="right">${open.length} of ${d.cases.length} flagged breaks</span></h3>
+      ${open.length ? `<div class="tablewrap"><table>
+        <thead><tr><th>Disbursal</th><th>Break</th><th>Partner</th><th class="r">Delta</th><th>Why it is open</th><th>Action available</th><th>Status</th></tr></thead>
+        <tbody>${openRows}</tbody></table></div>`
+      : `<div class="empty"><strong>Nothing is open</strong><p>Every break ES|QL flagged has either an approved workflow run or a recorded human resolution.</p></div>`}
+    </section>
+    <section class="panel">
+      <h3>Resolved <span class="right">${closed.length} of ${d.cases.length} flagged breaks</span></h3>
+      ${closed.length ? `<div class="tablewrap"><table>
+        <thead><tr><th>Disbursal</th><th>Break</th><th>Closed by</th><th>When</th><th>Reason it broke</th><th>What was done</th><th>Took</th></tr></thead>
+        <tbody>${closedRows}</tbody></table></div>`
+      : `<div class="empty"><strong>Nothing has been closed yet</strong><p>A break leaves this queue in one of two ways: a reviewer approves an action and the workflow writes to ledgerlens-audit, or an analyst resolves it by hand and it lands in ledgerlens-resolved-breaks.</p></div>`}
+    </section>
+    <section class="panel">
+      <h3>How long these breaks used to take <span class="right">${n(s.precedent_cases)} resolved cases</span></h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Break</th><th class="r">Cases</th><th class="r">Median</th><th class="r">90th percentile</th><th>Open now</th></tr></thead>
+        <tbody>${bench}</tbody></table></div>
+    </section>`;
+}
+
+// -------------------------------------------------- view 3: workflows
+
+function renderWorkflows(v, d) {
+  const s = d.stats;
+  const head = kpis([
+    kpi("Workflows defined", n(s.defined), "one per break type"),
+    kpi("Runs recorded", n(s.runs), "in ledgerlens-audit", s.runs ? "good" : ""),
+    kpi("Breaks eligible", n(s.eligible), "flagged by ES|QL"),
+    kpi("Awaiting approval", n(s.pending), `${n(s.closed_by_hand)} more were closed by hand`, s.pending ? "warnv" : ""),
+  ]);
+
+  const blocks = d.workflows.map((w) => {
+    const chain = w.steps.map((st) => `<span class="s" title="${esc(st.name)}">${esc(st.type)}</span>`).join('<span class="arrow">&#8594;</span>');
+    const taken = w.taken.length
+      ? `<ul>${w.taken.map((r) => `<li><a class="id" href="#timeline/${esc(r.disbursal_id)}">${esc(r.disbursal_id)}</a> <span class="t">${esc(when(r["@timestamp"]))}</span> <span class="dim">${esc(r.approved_by ?? "")}</span></li>`).join("")}</ul>`
+      : `<p class="none">Not run yet. This workflow only fires when a reviewer approves the recommended action for a ${esc(w.break_type)} break.</p>`;
+    const waiting = w.not_taken.filter((b) => !b.human_case);
+    const pending = w.not_taken.length
+      ? `<ul>${w.not_taken.map((b) => `<li><a class="id" href="#timeline/${esc(b.disbursal_id)}">${esc(b.disbursal_id)}</a> <span class="t">${esc(b.business_date)}</span> <span class="num dim">delta ${money(b.delta_inr)}</span>${b.human_case ? ` <span class="st human">closed by ${esc(b.human_case.resolved_by)}</span>` : ""}</li>`).join("")}</ul>`
+      : `<p class="none">No flagged ${esc(w.break_type)} break is waiting.</p>`;
+    return `<div class="wf">
+      <div class="top">
+        <span class="label">${esc(w.label)}</span>
+        <span class="type ${esc(w.break_type)}">${esc(w.break_type)}</span>
+        <span class="wid">${esc(w.workflow_id)}</span>
+      </div>
+      <div class="meta">Writes <code class="k">${esc(w.audit_action)}</code> to ledgerlens-audit. ${w.opens_case ? `Opens a <strong>${esc(w.severity)}</strong> severity Kibana case.` : "Opens no Kibana case."} Takes ${w.inputs.length} inputs, ${w.inputs.filter((i) => i.required).length} of them required.</div>
+      <div class="chain">${chain || '<span class="none">No steps parsed from the YAML.</span>'}</div>
+      <div class="split">
+        <div class="col taken"><div class="h">Actions taken <span class="c">${w.taken.length}</span></div>${taken}</div>
+        <div class="col pending"><div class="h">Eligible, not taken <span class="c">${waiting.length}</span></div>${pending}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  const unserved = d.unserved.length ? `
+    <section class="panel">
+      <h3>Break types with no workflow</h3>
+      <div class="body"><ul style="margin:0;padding:0;list-style:none;display:grid;gap:9px;font-size:13px;line-height:1.55">
+        ${d.unserved.map((u) => `<li><span class="type ${esc(u.break_type)}">${esc(u.break_type)}</span> <span class="dim">${esc(u.why)}</span></li>`).join("")}
+      </ul></div>
+    </section>` : "";
+
+  $("main").innerHTML = head + `<section class="panel"><h3>The action registry <span class="right">elastic/workflows/actions.json</span></h3>${blocks}</section>` + unserved;
+}
+
+// -------------------------------------------------- view 4: precedent library
+
+function renderPrecedents(v, d, q) {
+  const total = d.benchmarks.reduce((a, b) => a + b.cases, 0);
+  const span = d.benchmarks.reduce((a, b) => [a[0] && a[0] < b.first_case ? a[0] : b.first_case, a[1] && a[1] > b.last_case ? a[1] : b.last_case], [null, null]);
+  const weighted = d.benchmarks.reduce((a, b) => a + b.median_minutes * b.cases, 0) / (total || 1);
+  const head = kpis([
+    kpi("Resolved cases", n(total), span[0] ? `${day(span[0])} to ${day(span[1])}` : ""),
+    kpi("Break types covered", n(d.benchmarks.length), "each with a precedent"),
+    kpi("Typical time to resolve", esc(mins(Math.round(weighted))), "median, weighted by volume"),
+    kpi("Retrieval", d.mode === "hybrid" ? "Hybrid" : "Recent", d.mode === "hybrid" ? "BM25 and semantic, fused with RRF" : "newest first, no query"),
+  ]);
+
+  const bench = d.benchmarks.map((b) => `<tr>
+      <td class="nowrap"><span class="type ${esc(b.break_type)}">${esc(b.break_type)}</span></td>
+      <td class="money">${n(b.cases)}</td>
+      <td class="money">${esc(mins(Math.round(b.median_minutes)))}</td>
+      <td class="money">${esc(mins(Math.round(b.p90_minutes)))}</td>
+    </tr>`).join("");
+
+  const cards = d.rows.length ? d.rows.map((r) => `
+    <article class="case">
+      <div class="top">
+        <span class="cid">${esc(r.case_id)}</span>
+        <span class="type ${esc(r.break_type)}">${esc(r.break_type)}</span>
+        <span class="party">${esc(r.partner)}</span> <span class="rail">${esc(r.rail)}</span>
+        ${r._score != null ? `<span class="score">score ${Number(r._score).toFixed(4)}</span>` : `<span class="score">${esc(day(r.resolved_at))}</span>`}
+      </div>
+      <p class="sum">${esc(r.summary)}</p>
+      <div class="grid">
+        <div class="f"><b>Root cause</b>${esc(r.root_cause)}</div>
+        <div class="f"><b>Resolution</b>${esc(r.resolution)}</div>
+      </div>
+      <div class="foot">
+        <span>Resolved by ${esc(r.resolved_by)} in ${esc(mins(r.time_to_resolve_minutes))}</span>
+        <span><a class="id" href="#timeline/${esc(r.disbursal_id)}">${esc(r.disbursal_id)}</a></span>
+        <span>Amount ${money(r.amount_inr)}</span>
+        <span>Delta ${money(r.delta_inr)}</span>
+        ${list(r.tags).length ? `<span>${list(r.tags).map(esc).join(", ")}</span>` : ""}
+      </div>
+    </article>`).join("")
+    : `<div class="empty"><strong>Nothing matched that description</strong><p>Hybrid retrieval found no case above the cut-off. Try describing the failure rather than naming it: what the ledger said, what the bank file said, and what the pipeline did.</p></div>`;
+
+  $("main").innerHTML = head + `
+    <section class="panel">
+      <h3>ledgerlens-resolved-breaks <span class="right">${d.rows.length} shown, ${d.took} ms</span></h3>
+      <div class="filters">
+        <label style="flex:1 1 320px">Describe a break
+          <input type="search" id="q" style="flex:1" placeholder="double credit after a gateway timeout retry, two UTRs" value="${esc(q)}" />
+        </label>
+        <button type="button" id="go">Search precedents</button>
+        ${q ? '<button type="button" id="clear">Clear</button>' : ""}
+      </div>
+      <div class="cases">${cards}</div>
+    </section>
+    <section class="panel">
+      <h3>Resolution time by break type</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Break</th><th class="r">Cases</th><th class="r">Median</th><th class="r">90th percentile</th></tr></thead>
+        <tbody>${bench}</tbody></table></div>
+    </section>`;
+
+  const run = () => (location.hash = `precedents/${encodeURIComponent($("q").value.trim())}`);
+  $("go").addEventListener("click", run);
+  $("q").addEventListener("keydown", (e) => { if (e.key === "Enter") run(); });
+  $("clear")?.addEventListener("click", () => (location.hash = "precedents"));
+}
+
+// -------------------------------------------------- view 5: timeline
+
+function timelineRow(ev) {
+  const r = ev.row;
+  if (ev.lane === "ledger") {
+    return { desc: [r.event_type, r.status].filter(Boolean).join(" · "), detail: r.description ?? "", ids: [r.event_id, r.utr ? `UTR ${r.utr}` : "", r.amount_inr != null ? `amount ${plain(r.amount_inr)}` : ""].filter(Boolean), fail: false };
+  }
+  if (ev.lane === "settlement") {
+    return { desc: ["Settlement row", r.status].filter(Boolean).join(" · "), detail: r.narration ?? "", ids: [r.row_id, r.utr ? `UTR ${r.utr}` : "", r.amount_inr != null ? `amount ${plain(r.amount_inr)}` : "", r.fee_inr != null ? `fee ${plain(r.fee_inr)}` : "", r.value_date ? `value date ${r.value_date}` : ""].filter(Boolean), fail: false };
+  }
+  if (ev.lane === "pipeline") {
+    const failed = r["event.outcome"] === "failure";
+    return {
+      desc: `${r["service.name"]} · ${r["span.name"]}${failed ? ` failed: ${r["error.type"] ?? ""}` : ""}`,
+      detail: failed ? (r["error.message"] ?? "") : "",
+      ids: [r["span.id"], `${r.duration_ms} ms`, r["http.response.status_code"] ? `HTTP ${r["http.response.status_code"]}` : "", r["labels.psp_status"] ? `PSP ${r["labels.psp_status"]}` : "", r["labels.psp_reason"] ? String(r["labels.psp_reason"]) : "", r["labels.idempotency_key_present"] === false ? "no idempotency key" : ""].filter(Boolean),
+      fail: failed,
+    };
+  }
+  return { desc: `${r.action} approved by ${r.approved_by ?? ""}`, detail: r.message ?? r.summary ?? "", ids: [r.case_id && r.case_id !== "no-kibana-case" ? `case ${r.case_id}` : "", r.execution_id ? `exec ${r.execution_id}` : ""].filter(Boolean), fail: false };
+}
+
+function renderTimeline(v, d, breaks) {
+  const c = d.counts;
+  const del = d.delta;
+  const head = kpis([
+    kpi("Verdict", del ? `<span class="type ${esc(del.break_type)}" style="font-size:13px">${esc(del.break_type)}</span>` : "None", del ? "computed by ledgerlens.break_delta" : "no reconciliation row"),
+    kpi("Delta", del ? money(del.delta_inr) : "·", del ? `ledger ${plain(del.ledger_inr)} against settled ${plain(del.settled_inr)}` : "", del && Number(del.delta_inr) !== 0 ? "badv" : ""),
+    kpi("Events on record", n(c.ledger + c.settlement + c.pipeline + c.action), `${c.ledger} ledger, ${c.settlement} settlement, ${c.pipeline} pipeline, ${c.action} action`),
+    kpi("Actions taken", n(c.action), c.action ? "written to ledgerlens-audit" : "none approved", c.action ? "good" : ""),
+  ]);
+
+  const picker = `
+    <div class="filters">
+      <label>Flagged break
+        <select id="pick">
+          <option value="">Pick one of the ${breaks.length} flagged breaks</option>
+          ${breaks.map((b) => `<option value="${esc(b.disbursal_id)}"${b.disbursal_id === d.disbursal_id ? " selected" : ""}>${esc(b.disbursal_id)} · ${esc(b.break_type)} · ${esc(b.partner)}</option>`).join("")}
+        </select>
+      </label>
+      <label>Or any disbursal <input type="text" id="any" placeholder="DSB-20260916-00297" value="${esc(d.disbursal_id)}" size="20" /></label>
+      <button type="button" id="goId">Show history</button>
+      <span class="right">${esc(d.disbursal_id)}</span>
+    </div>`;
+
+  const rows = d.events.map((ev) => {
+    const r = timelineRow(ev);
+    return `<div class="ev${r.fail ? " fail" : ""}">
+      <div class="t">${esc(when(ev.at))}</div>
+      <div><span class="lane ${ev.lane}">${ev.lane}</span></div>
+      <div>
+        <div class="desc">${esc(r.desc)}</div>
+        ${r.detail ? `<div style="font-size:12.5px;color:var(--ink-2);margin-top:3px;line-height:1.5">${esc(r.detail)}</div>` : ""}
+        ${r.ids.length ? `<div class="ids">${r.ids.map(esc).join(" · ")}</div>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  $("main").innerHTML = head + `
+    <section class="panel">
+      <h3>Every record for ${esc(d.disbursal_id)} <span class="right">${d.events.length} events, oldest first</span></h3>
+      ${picker}
+      <div class="lanes">
+        <span class="lane ledger">ledger</span><span>event-sourced ledger</span>
+        <span class="lane settlement">settlement</span><span>normalised bank or PSP row</span>
+        <span class="lane pipeline">pipeline</span><span>disbursal trace span</span>
+        <span class="lane action">action</span><span>approved workflow</span>
+      </div>
+      ${d.events.length ? `<div class="tl">${rows}</div>`
+      : `<div class="empty"><strong>No record carries this disbursal id</strong><p>Nothing in ledgerlens-recon, ledgerlens-traces or ledgerlens-audit references ${esc(d.disbursal_id)}. Check the identifier, or pick one of the flagged breaks above.</p></div>`}
+    </section>`;
+
+  const go = (id) => { if (/^DSB-\d{8}-\d{5}$/.test(id)) location.hash = `timeline/${id}`; };
+  $("pick").addEventListener("change", (e) => go(e.target.value));
+  $("goId").addEventListener("click", () => go($("any").value.trim()));
+  $("any").addEventListener("keydown", (e) => { if (e.key === "Enter") go($("any").value.trim()); });
+}
+
+// -------------------------------------------------- routing
+
+let current = "audit";
+
+async function route() {
+  const [id, ...rest] = (location.hash.replace(/^#/, "") || "audit").split("/");
+  const arg = decodeURIComponent(rest.join("/"));
+  const v = VIEWS.find((x) => x.id === id) ?? VIEWS[0];
+  current = v.id;
+  renderNav(cache.counts ?? {});
+  loading(v);
+
+  try {
+    if (v.id === "audit") {
+      const d = (cache.audit ??= await api("/api/h/audit"));
+      renderAudit(v, d);
+    } else if (v.id === "cases") {
+      const d = (cache.cases ??= await api("/api/h/cases"));
+      renderCases(v, d);
+    } else if (v.id === "workflows") {
+      const d = (cache.workflows ??= await api("/api/h/workflows"));
+      renderWorkflows(v, d);
+    } else if (v.id === "precedents") {
+      const d = await api(`/api/h/precedents?q=${encodeURIComponent(arg)}`);
+      renderPrecedents(v, d, arg);
+    } else {
+      const cases = (cache.cases ??= await api("/api/h/cases"));
+      const breaks = cases.cases;
+      const onDemoDay = breaks.find((b) => b.business_date === config.demo_business_date);
+      const target = /^DSB-\d{8}-\d{5}$/.test(arg) ? arg : (onDemoDay ?? breaks[0])?.disbursal_id;
+      if (!target) {
+        $("main").innerHTML = viewHead(v) + `<section class="panel"><div class="empty"><strong>Nothing to trace</strong><p>ES|QL has flagged no break, so there is no disbursal to open by default. Type an identifier to look one up.</p></div></section>`;
+        return;
+      }
+      renderTimeline(v, await api(`/api/h/timeline?disbursal_id=${encodeURIComponent(target)}`), breaks);
+    }
+    updateCounts();
+  } catch (e) {
+    failed(v, e);
+  }
+}
+
+function updateCounts() {
+  cache.counts = {
+    audit: cache.audit ? cache.audit.stats.records : "",
+    cases: cache.cases ? `${cache.cases.stats.open} open` : "",
+    workflows: cache.workflows ? cache.workflows.stats.defined : "",
+    precedents: "",
+    timeline: "",
+  };
+  renderNav(cache.counts);
+}
+
+async function init() {
+  try {
+    config = await api("/api/h/config");
+  } catch (e) {
+    renderNav({});
+    $("main").innerHTML = `<p class="err"><strong>Could not reach Elasticsearch.</strong><br /><code>${esc(e.message)}</code></p>`;
+    return;
+  }
+  const dates = config.business_dates;
+  $("period").textContent = dates.length ? `${dates[0].business_date} to ${dates[dates.length - 1].business_date}` : "no ledger data";
+  $("kibanaLink").href = config.kibana_url;
+  $("idx").innerHTML = config.indices.map((i) => `<div class="row"><span class="k">${esc(i.index.replace("ledgerlens-", ""))}</span><span class="v">${i.docs == null ? "unavailable" : n(i.docs)}</span></div>`).join("");
+  addEventListener("hashchange", route);
+  await route();
+}
+
+init();
+</script>
+</body>
+</html>

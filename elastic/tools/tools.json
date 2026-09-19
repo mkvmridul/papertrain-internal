@@ -1,0 +1,51 @@
+[
+  {
+    "id": "ledgerlens.list_breaks",
+    "type": "esql",
+    "query_file": "ledgerlens.list_breaks.esql",
+    "description": "List every reconciliation break for one business date. Matches all DISBURSAL_SUCCEEDED ledger events for that date against all settlement rows, grouped by disbursal_id, and returns only groups that break a rule, each with its computed break_type, ledger vs settled amounts (paise and INR), delta, settlement row count and fee comparison. Use this first when asked about a day. All figures are computed by ES|QL; quote them verbatim.",
+    "params": {
+      "business_date": { "type": "string", "description": "Business date in YYYY-MM-DD format, e.g. 2026-09-16" }
+    }
+  },
+  {
+    "id": "ledgerlens.break_delta",
+    "type": "esql",
+    "query_file": "ledgerlens.break_delta.esql",
+    "description": "Compute the exact figures and the rule-based classification for ONE disbursal_id: ledger amount, settled amount, principal delta, expected vs charged fee, fee delta, settlement row count, break_type, the rule that fired (rule_fired), and every source ID (ledger_event_ids, settlement_row_ids, utrs). Always call this before writing a report. Quote every number and ID verbatim; never recompute.",
+    "params": {
+      "disbursal_id": { "type": "string", "description": "The disbursal identifier, e.g. DSB-20260916-00297" }
+    }
+  },
+  {
+    "id": "ledgerlens.evidence_rows",
+    "type": "esql",
+    "query_file": "ledgerlens.evidence_rows.esql",
+    "description": "Fetch the raw evidence rows for ONE disbursal_id in time order: each ledger event (event_id, event_type, amount) and each settlement row (row_id, utr, amount, fee, value_date). Use it to cite the specific events and rows behind the figures from ledgerlens.break_delta.",
+    "params": {
+      "disbursal_id": { "type": "string", "description": "The disbursal identifier, e.g. DSB-20260916-00297" }
+    }
+  },
+  {
+    "id": "ledgerlens.trace_failure_point",
+    "type": "esql",
+    "query_file": "ledgerlens.trace_failure_point.esql",
+    "description": "Return the disbursal-pipeline spans (APM-style trace) for ONE disbursal_id with failed spans first. If the first row has event.outcome = failure, that span (span.name, error.type, error.message, labels.psp_status, labels.psp_reason) is the failure point. If no span failed, say the pipeline was clean. Use this to explain WHY the break happened.",
+    "params": {
+      "disbursal_id": { "type": "string", "description": "The disbursal identifier, e.g. DSB-20260916-00297" }
+    }
+  },
+  {
+    "id": "ledgerlens.similar_cases",
+    "type": "esql",
+    "query_file": "ledgerlens.similar_cases.esql",
+    "description": "Hybrid search (BM25 + semantic, fused with RRF) over the library of past breaks that a human already resolved. Pass a plain-language description of the current break (type, partner, rail, what the trace showed). Returns up to 5 precedents with their root cause, resolution, who resolved it and how long it took. Use it to recommend an action grounded in precedent.",
+    "params": {
+      "query": { "type": "string", "description": "Plain-language description of the break, e.g. 'double credit after gateway timeout retry, two UTRs, PAYSTREAM IMPS'" }
+    },
+    "fallback": {
+      "type": "index_search",
+      "configuration": { "pattern": "ledgerlens-resolved-breaks" }
+    }
+  }
+]

@@ -1,0 +1,29 @@
+{
+  "mappings": {
+    "dynamic": "strict",
+    "_meta": {
+      "purpose": "Library of past breaks a human already resolved. Retrieved with hybrid search (BM25 on summary + semantic on summary_semantic, fused with RRF) so an analyst's differently-worded description still finds the matching precedent.",
+      "semantic": "summary is copied into summary_semantic (semantic_text). Elastic embeds it at index and query time with the project's default inference endpoint; no embedding code in this repo."
+    },
+    "properties": {
+      "case_id":                 { "type": "keyword" },
+      "opened_at":               { "type": "date" },
+      "resolved_at":             { "type": "date" },
+      "business_date":           { "type": "keyword" },
+      "break_type":              { "type": "keyword" },
+      "partner":                 { "type": "keyword" },
+      "rail":                    { "type": "keyword" },
+      "disbursal_id":            { "type": "keyword" },
+      "loan_id":                 { "type": "keyword" },
+      "amount_paise":            { "type": "long" },
+      "delta_paise":             { "type": "long" },
+      "summary":                 { "type": "text", "copy_to": "summary_semantic" },
+      "summary_semantic":        { "type": "semantic_text" },
+      "root_cause":              { "type": "text" },
+      "resolution":              { "type": "text" },
+      "resolved_by":             { "type": "keyword" },
+      "time_to_resolve_minutes": { "type": "integer" },
+      "tags":                    { "type": "keyword" }
+    }
+  }
+}

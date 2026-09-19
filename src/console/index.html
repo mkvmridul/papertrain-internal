@@ -1,0 +1,1286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LedgerLens</title>
+<!-- Runs before first paint so a saved theme does not flash the other one. The module script below owns everything else. -->
+<script>try{var t=localStorage.getItem("ledgerlens.theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+<style>
+  /* Radius scale, locked: --r panels/blocks, --r-ctl controls, --r-chip chips and code. */
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --surface: #f7f9fb;
+    --ink: #11151c; --ink-2: #454e5c; --muted: #6b7484; --line: #dfe4ea; --line-2: #eef1f5;
+    --accent: #0b5fb8; --accent-ink: #ffffff; --accent-soft: #e8f1fc;
+    --ok: #146c40; --ok-bg: #e4f4ea; --bad: #a81f18; --bad-bg: #fbe9e7; --warn: #7d5100; --warn-bg: #fdf1d6;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --r: 8px; --r-ctl: 6px; --r-chip: 3px;
+    color-scheme: light;
+  }
+  /* Dark palette applies on a dark system unless overridden to light, and whenever it is chosen
+     explicitly. Two selectors, one palette: the media query is the no-JS baseline. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1016; --panel: #14181f; --surface: #191e27;
+      --ink: #e9ecf2; --ink-2: #b3bbc8; --muted: #8b94a3; --line: #262c37; --line-2: #1e242d;
+      --accent: #63a6ef; --accent-ink: #0a1119; --accent-soft: #16273a;
+      --ok: #62cf8d; --ok-bg: #13301f; --bad: #ff9a90; --bad-bg: #38201d; --warn: #efc266; --warn-bg: #352c13;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1016; --panel: #14181f; --surface: #191e27;
+    --ink: #e9ecf2; --ink-2: #b3bbc8; --muted: #8b94a3; --line: #262c37; --line-2: #1e242d;
+    --accent: #63a6ef; --accent-ink: #0a1119; --accent-soft: #16273a;
+    --ok: #62cf8d; --ok-bg: #13301f; --bad: #ff9a90; --bad-bg: #38201d; --warn: #efc266; --warn-bg: #352c13;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  code, .mono { font-family: var(--mono); }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .dim { color: var(--muted); }
+
+  /* ---------------------------------------------------------------- header */
+  /* Two groups: brand on the left, controls on the right. When both do not fit on one line the controls wrap under
+     the brand, still right-aligned. The mode badge truncates only when the brand alone is wider than the header. */
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-height: 60px; padding: 8px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header .brand { display: flex; align-items: center; gap: 14px; flex: 1 1 auto; min-width: 0; }
+  header .controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 14px; margin-left: auto; }
+  header h1 { font-size: 16px; font-weight: 650; margin: 0; letter-spacing: -.1px; white-space: nowrap; }
+  header h1 span { color: var(--muted); font-weight: 400; font-size: 12.5px; margin-left: 9px; }
+  #modeBadge { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  header label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  header input[type=date] { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--bg); color: var(--ink); }
+  header input[type=date]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .badge { font-size: 11.5px; padding: 3px 9px; border-radius: var(--r-ctl); border: 1px solid var(--line); color: var(--ink-2); background: var(--surface); white-space: nowrap; text-decoration: none; }
+  .badge.mock { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); font-weight: 650; letter-spacing: .3px; }
+  a.badge:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ---------------------------------------------------------------- kpi strip: one bordered strip, hairline dividers */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin: 16px 20px 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+  .kpi { padding: 13px 16px 14px; border-left: 1px solid var(--line-2); }
+  .kpi:first-child { border-left: 0; }
+  .kpi .k { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; }
+  .kpi .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 23px; font-weight: 600; letter-spacing: -.5px; margin-top: 5px; line-height: 1.1; }
+  .kpi .s { color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+  .kpi.good .v { color: var(--ok); }
+  .rs { opacity: .55; margin-right: 1px; font-weight: 400; }
+  .pa { opacity: .5; font-size: .82em; }
+
+  /* ---------------------------------------------------------------- layout */
+  /* The break queue table is about 775px wide with every column showing, so 780px is the queue column's floor.
+     Two columns need 780 + 16 + 460 plus 40px of padding, about 1296px; below that the panels stack instead of clipping the queue. */
+  main { display: grid; grid-template-columns: minmax(780px, 47fr) minmax(460px, 53fr); gap: 16px; padding: 16px 20px 24px; align-items: start; }
+  @media (max-width: 1295px) { main { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+  .panel > h2 { font-size: 11.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); margin: 0; padding: 11px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
+  .panel > h2 .right { margin-left: auto; font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 12px; font-family: var(--mono); color: var(--ink-2); }
+  .scroll { max-height: calc(100dvh - 250px); overflow: auto; }
+
+  /* ---------------------------------------------------------------- tables */
+  table { width: 100%; border-collapse: collapse; }
+  thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); font-size: 10.5px; color: var(--muted); font-weight: 650; text-transform: uppercase; letter-spacing: .5px; text-align: left; padding: 8px 9px; border-bottom: 1px solid var(--line); }
+  thead th.r { text-align: right; }
+  tbody td { padding: 9px; border-bottom: 1px solid var(--line-2); white-space: nowrap; vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.money { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; }
+  td.money.neg { color: var(--bad); }
+  td.money.zero { color: var(--muted); }
+  tr.row { cursor: pointer; }
+  tr.row td:first-child { box-shadow: inset 3px 0 0 transparent; }
+  tr.row:hover { background: var(--surface); }
+  tr.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  tr.row.active { background: var(--accent-soft); }
+  tr.row.active td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+  tr.row.active td { font-weight: 550; }
+  .id { font-family: var(--mono); font-size: 12.5px; letter-spacing: -.2px; }
+  .party { font-weight: 550; font-size: 13px; }
+  .rail { color: var(--muted); font-size: 11px; font-family: var(--mono); letter-spacing: .2px; }
+
+  .type { display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: .3px; padding: 2.5px 6px; border-radius: var(--r-chip); background: var(--surface); border: 1px solid var(--line); color: var(--ink-2); }
+  .type.MISSING_CREDIT, .type.DOUBLE_DEBIT { background: var(--bad-bg); color: var(--bad); border-color: transparent; }
+  .type.FEE_MISMATCH { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+  .type.TIMING_T1 { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
+  .type.UNRESOLVED { background: transparent; color: var(--muted); border-style: dashed; }
+
+  /* ---------------------------------------------------------------- controls */
+  button { font: inherit; font-size: 13px; padding: 7px 13px; border-radius: var(--r-ctl); border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; transition: background .12s, border-color .12s, transform .06s; }
+  button:hover { border-color: var(--ink-2); }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); border-color: var(--accent); }
+  button.danger { color: var(--bad); border-color: var(--line); }
+  button.danger:hover { border-color: var(--bad); }
+  button.theme { font-size: 11.5px; padding: 3px 9px; color: var(--ink-2); background: var(--surface); min-width: 62px; }
+  button.lang { font-size: 12px; padding: 5px 9px; }
+  button.lang[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .45; cursor: default; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--accent); }
+
+  .body { padding: 14px; }
+  .empty { color: var(--muted); padding: 44px 16px; text-align: center; font-size: 13px; }
+  .empty strong { display: block; color: var(--ink); font-size: 15px; font-weight: 600; margin-bottom: 5px; }
+
+  /* ---------------------------------------------------------------- agent trace */
+  details.trace { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); margin-bottom: 14px; overflow: hidden; }
+  details.trace > summary { cursor: pointer; list-style: none; padding: 8px 12px; font-size: 10.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  details.trace > summary::-webkit-details-marker { display: none; }
+  details.trace > summary::after { content: "▸"; margin-left: auto; font-size: 10px; transition: transform .15s; }
+  details.trace[open] > summary::after { transform: rotate(90deg); }
+  .steps { border-top: 1px solid var(--line); padding: 4px 0; }
+  .step { display: grid; grid-template-columns: 30px 1fr auto 78px; gap: 10px; align-items: baseline; padding: 4px 12px; font-size: 12.5px; }
+  .step .n { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: right; }
+  .step code { font-size: 12px; color: var(--ink); }
+  .step .params { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .step .rows { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .step .ms { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700; color: var(--ok); text-align: right; white-space: nowrap; }
+  .step.reasoning { grid-template-columns: 30px 1fr; color: var(--ink-2); font-size: 12.5px; line-height: 1.5; padding-top: 2px; padding-bottom: 6px; }
+  .step.reasoning .n::after { content: "↳"; }
+
+  /* ---------------------------------------------------------------- where the time went */
+  .timing { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); overflow: hidden; margin-bottom: 14px; }
+  .timing .cell { padding: 11px 14px 12px; border-left: 1px solid var(--line-2); }
+  .timing .cell:first-child { border-left: 0; }
+  .timing .cell .k { font-size: 10.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+  .timing .cell .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 700; letter-spacing: -.8px; line-height: 1.1; margin-top: 5px; }
+  .timing .cell .s { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .timing .cell.esql { background: var(--ok-bg); }
+  .timing .cell.esql .k, .timing .cell.esql .v { color: var(--ok); }
+  .timing .cell.model .v { color: var(--accent); }
+  .timing .cell.total .v { color: var(--ink); }
+
+  /* ---------------------------------------------------------------- traceability bar */
+  .trust { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 11px 13px; border-radius: var(--r); margin-bottom: 14px; border: 1px solid var(--line); background: var(--surface); font-size: 12.5px; }
+  .trust.ok { background: var(--ok-bg); border-color: transparent; color: var(--ok); }
+  .trust.bad { background: var(--bad-bg); border-color: transparent; color: var(--bad); }
+  .trust .score { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 17px; font-weight: 650; letter-spacing: -.4px; }
+  .trust .tail { margin-left: auto; color: var(--muted); font-size: 11.5px; }
+  .trust.ok .tail, .trust.bad .tail { color: inherit; opacity: .75; }
+
+  /* ---------------------------------------------------------------- verdict header */
+  .verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 0 0 14px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+  .verdict .vid { font-family: var(--mono); font-size: 19px; font-weight: 600; letter-spacing: -.4px; }
+  .verdict .vrule { margin-left: auto; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 7px; }
+  .verdict .vrule code { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-chip); padding: 2px 6px; font-size: 11.5px; color: var(--ink-2); }
+
+  /* ---------------------------------------------------------------- figures */
+  .figures { margin-bottom: 18px; }
+  .hero { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+  @media (max-width: 560px) { .hero { grid-template-columns: 1fr; } }
+  .hero .cell { padding: 12px 14px 13px; border-left: 1px solid var(--line-2); }
+  .hero .cell:first-child { border-left: 0; }
+  .hero .cell .k { font-size: 10.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+  .hero .cell .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; letter-spacing: -.6px; margin-top: 5px; line-height: 1.15; }
+  .hero .cell.delta { background: var(--bad-bg); }
+  .hero .cell.delta .k, .hero .cell.delta .v { color: var(--bad); }
+  .hero .cell.delta.flat { background: var(--surface); }
+  .hero .cell.delta.flat .k { color: var(--muted); }
+  .hero .cell.delta.flat .v { color: var(--ink-2); }
+  .rest { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 20px; margin-top: 10px; }
+  .rest .line { display: flex; align-items: baseline; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line-2); font-size: 13px; }
+  .rest .line .k { color: var(--muted); font-size: 12.5px; }
+  .rest .line .v { margin-left: auto; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ---------------------------------------------------------------- report blocks */
+  .sec { margin-bottom: 18px; }
+  .sec > .lbl { font-size: 10.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 7px; display: flex; align-items: baseline; gap: 8px; }
+  .sec > .lbl .src { font-family: var(--mono); font-size: 10.5px; font-weight: 400; letter-spacing: 0; text-transform: none; opacity: .8; }
+  .evidence { border: 1px solid var(--line); border-radius: var(--r); overflow: auto; }
+  .evidence table { font-size: 12.5px; }
+  .evidence thead th { background: var(--surface); }
+  .evidence tbody td { padding: 7px 11px; }
+  .evidence td.t { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .evidence td.ev { font-family: var(--mono); font-size: 11.5px; letter-spacing: .2px; }
+  .block { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 12px 14px; font-size: 13px; line-height: 1.6; color: var(--ink-2); }
+  .block code { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-chip); padding: 1px 5px; font-size: 11.5px; color: var(--ink); }
+  .cause { border: 1px solid var(--line); border-left: 3px solid var(--ink-2); border-radius: var(--r); background: var(--surface); padding: 15px 17px; font-size: 15px; line-height: 1.62; color: var(--ink); max-width: 76ch; }
+  .action { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--r); background: var(--accent-soft); padding: 13px 16px; font-size: 14px; line-height: 1.58; color: var(--ink); }
+  .conf { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; font-size: 13px; line-height: 1.6; color: var(--ink-2); }
+  .conf .chip { font-family: var(--mono); font-size: 11px; font-weight: 650; letter-spacing: .4px; padding: 3px 8px; border-radius: var(--r-chip); background: var(--surface); border: 1px solid var(--line); }
+  .conf .chip.high { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
+  .conf .chip.medium { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+  .conf .chip.low { background: var(--bad-bg); color: var(--bad); border-color: transparent; }
+  .conf .rest-text { flex: 1 1 260px; }
+
+  mark.traced { background: var(--ok-bg); color: inherit; border-bottom: 1.5px solid var(--ok); padding: 0 1px; border-radius: var(--r-chip); }
+  mark.untraced { background: var(--bad-bg); color: var(--bad); border-bottom: 1.5px solid var(--bad); padding: 0 1px; border-radius: var(--r-chip); font-weight: 650; }
+
+  /* raw markdown fallback, used when the report does not follow the expected headings */
+  .report { line-height: 1.58; font-size: 13.5px; }
+  .report h2 { font-size: 16px; margin: 4px 0 10px; }
+  .report p { margin: 7px 0; }
+  .report ul { margin: 4px 0 8px 18px; padding: 0; }
+  .report code { font-family: var(--mono); font-size: 12.5px; background: var(--surface); border: 1px solid var(--line); padding: 1px 4px; border-radius: var(--r-chip); }
+
+  /* ---------------------------------------------------------------- actions and notes */
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); align-items: center; }
+  .actions .right { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .closing { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .note { margin-top: 12px; padding: 11px 13px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+  .note.ok { background: var(--ok-bg); border-color: transparent; }
+  .note.err { background: var(--bad-bg); border-color: transparent; color: var(--bad); }
+  .note .audit { margin-top: 7px; font-family: var(--mono); font-size: 11.5px; opacity: .85; }
+  .note .audit .msg { display: block; font-family: inherit; opacity: .9; margin-top: 4px; white-space: pre-wrap; }
+  .prefetch { margin-bottom: 14px; }
+  .prefetch .verdict-note { font-size: 11.5px; color: var(--muted); margin: 0 0 4px; line-height: 1.5; }
+  .prefetch .verdict-note strong { color: var(--ok); font-weight: 650; }
+  .draft { border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: var(--r); background: var(--surface); padding: 13px 15px; font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; }
+
+  /* ---------------------------------------------------------------- live status: phases tick as each tool returns, the clock runs until the report lands */
+  .trust.live { background: var(--accent-soft); border-color: transparent; color: var(--ink); }
+  .phases { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+  .ph { font-family: var(--mono); font-size: 11px; font-weight: 650; letter-spacing: .3px; padding: 3px 8px; border-radius: var(--r-chip); border: 1px solid var(--line); color: var(--muted); background: var(--panel); }
+  .ph.run { border-color: var(--accent); color: var(--accent); }
+  .ph.done { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
+  .ph.done::before { content: "✓ "; }
+  .trust .timer { margin-left: auto; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 650; color: var(--ink); }
+  .trust .hint { flex-basis: 100%; font-size: 12px; color: var(--ink-2); }
+
+  /* ---------------------------------------------------------------- chat drawer: a fixed panel on the right, opt-in, pushes the console aside on wide screens */
+  :root { --chat-w: 440px; }
+  button.chat-toggle { font-size: 12.5px; padding: 5px 12px; font-weight: 600; color: var(--accent); border-color: var(--accent); background: var(--panel); white-space: nowrap; }
+  button.chat-toggle[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  #chat { position: fixed; top: 0; right: 0; bottom: 0; width: min(var(--chat-w), 100vw); background: var(--panel); border-left: 1px solid var(--line); display: none; flex-direction: column; z-index: 5; }
+  body.chat-open #chat { display: flex; }
+  @media (min-width: 1081px) {
+    body.chat-open header, body.chat-open main { padding-right: calc(var(--chat-w) + 20px); }
+    body.chat-open .kpis { margin-right: calc(var(--chat-w) + 20px); }
+  }
+  /* Two columns plus the drawer need about 1756px (1296 + 460); below that the console goes single column while the chat is open. */
+  @media (min-width: 1081px) and (max-width: 1755px) { body.chat-open main { grid-template-columns: 1fr; } }
+  .chat-head { display: flex; align-items: center; gap: 8px; height: 60px; padding: 0 14px; border-bottom: 1px solid var(--line); }
+  .chat-head strong { font-size: 11.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); white-space: nowrap; }
+  .chat-head .ctx { flex: 1; min-width: 0; color: var(--ink-2); font-family: var(--mono); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-head .ctx a { color: var(--accent); text-decoration: none; }
+  .chat-log { flex: 1; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; background: var(--bg); }
+  .chat-log .empty { padding: 30px 12px; }
+  .msg { display: flex; flex-direction: column; gap: 4px; max-width: 92%; }
+  .msg.user { align-self: flex-end; align-items: flex-end; }
+  .msg.agent { align-self: flex-start; max-width: 100%; }
+  .msg.system { align-self: center; max-width: 100%; color: var(--muted); font-size: 11.5px; text-align: center; padding: 2px 0; }
+  .bubble { border: 1px solid var(--line); border-radius: var(--r); padding: 9px 12px; font-size: 13px; line-height: 1.55; background: var(--panel); color: var(--ink); overflow-wrap: anywhere; }
+  .msg.user .bubble { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); white-space: pre-wrap; }
+  .msg.agent .bubble.err { background: var(--bad-bg); border-color: transparent; color: var(--bad); }
+  .bubble p { margin: 5px 0; }
+  .bubble p:first-child, .bubble h2:first-child { margin-top: 0; }
+  .bubble p:last-child { margin-bottom: 0; }
+  .bubble ul { margin: 4px 0 6px 18px; padding: 0; }
+  .bubble h2 { font-size: 14px; margin: 2px 0 8px; }
+  .bubble code { font-family: var(--mono); font-size: 12px; background: var(--surface); border: 1px solid var(--line); padding: 0 4px; border-radius: var(--r-chip); }
+  .bubble .tbl { overflow: auto; margin: 6px 0; border: 1px solid var(--line); border-radius: var(--r); }
+  .bubble table { font-size: 11.5px; }
+  .bubble thead th { position: static; padding: 6px 9px; background: var(--surface); }
+  .bubble tbody td { padding: 5px 9px; }
+  .msg .tools { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 7px; }
+  .msg .tools code { font-size: 11px; color: var(--ink-2); }
+  .msg .status { color: var(--muted); font-size: 12px; }
+  .msg .score { font-family: var(--mono); font-size: 11px; font-weight: 650; padding: 2px 7px; border-radius: var(--r-chip); background: var(--surface); border: 1px solid var(--line); color: var(--ink-2); }
+  .msg .score.ok { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
+  .msg .score.bad { background: var(--bad-bg); color: var(--bad); border-color: transparent; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 10px; background: var(--bg); }
+  .chips button { font-size: 12px; padding: 5px 10px; border-radius: 999px; color: var(--ink-2); background: var(--panel); }
+  .chat-form { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--line); background: var(--panel); align-items: flex-end; }
+  .chat-form textarea { flex: 1; resize: none; font: inherit; font-size: 13px; line-height: 1.4; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--bg); color: var(--ink); max-height: 140px; }
+  .chat-form textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .chat-form button.mic { padding: 7px 10px; }
+  .chat-form button.mic[aria-pressed="true"] { background: var(--bad-bg); border-color: var(--bad); color: var(--bad); }
+  .msg .meta { display: flex; align-items: center; gap: 6px; }
+  .msg button.listen { font-size: 11px; padding: 2px 8px; color: var(--ink-2); }
+
+  /* ---------------------------------------------------------------- loading */
+  .spinner { display: inline-block; width: 11px; height: 11px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; vertical-align: -1px; margin-right: 7px; }
+  .skel { height: 11px; border-radius: var(--r-chip); background: var(--line-2); }
+  .skel.w1 { width: 62%; } .skel.w2 { width: 38%; } .skel.w3 { width: 80%; }
+  @media (prefers-reduced-motion: no-preference) {
+    .spinner { animation: spin .8s linear infinite; }
+    .skel { background: linear-gradient(90deg, var(--line-2) 0%, var(--line) 50%, var(--line-2) 100%); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
+    .fade { animation: fade .2s ease-out; }
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+  @keyframes fade { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>LedgerLens <span>reconciliation-break investigator</span></h1>
+    <span id="modeBadge" class="badge">connecting…</span>
+  </div>
+  <div class="controls">
+    <label>Business date <input type="date" id="date" /></label>
+    <button type="button" class="chat-toggle" id="chatToggle" aria-pressed="false" title="Chat with the agent">Chat with agent</button>
+    <button type="button" class="theme" id="theme"></button>
+    <a class="badge" href="/history" target="_blank" rel="noopener">History ↗</a>
+    <a id="kibanaLink" class="badge" target="_blank" rel="noopener">Agent in Kibana ↗</a>
+  </div>
+</header>
+
+<section class="kpis">
+  <div class="kpi"><div class="k">Successful disbursals</div><div class="v" id="tDisb">·</div><div class="s" id="tPartners">&nbsp;</div></div>
+  <div class="kpi"><div class="k">Disbursed value</div><div class="v" id="tValue">·</div><div class="s">ledger DISBURSAL_SUCCEEDED</div></div>
+  <div class="kpi"><div class="k">Breaks flagged by ES|QL</div><div class="v" id="tBreaks">·</div><div class="s" id="tTook">&nbsp;</div></div>
+  <div class="kpi good"><div class="k">Figures computed by the LLM</div><div class="v">0</div><div class="s">by construction</div></div>
+</section>
+
+<main>
+  <section class="panel">
+    <h2>Break queue <span class="right" id="queueMeta"></span></h2>
+    <div class="scroll" id="queue"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Investigation <span class="right" id="invMeta"></span></h2>
+    <div class="body" id="inv"><div class="empty"><strong>No break selected</strong>Pick a row from the break queue. The agent runs the ES|QL tools, then narrates what they returned.</div></div>
+  </section>
+</main>
+
+<aside id="chat" aria-label="Chat with the LedgerLens agent">
+  <div class="chat-head">
+    <strong>Ask the agent</strong>
+    <span class="ctx" id="chatCtx"></span>
+    <button type="button" class="theme" id="chatNew" title="Start a new conversation">New</button>
+    <button type="button" class="theme" id="chatClose" aria-label="Close chat" title="Close chat">Close</button>
+  </div>
+  <div class="chat-log" id="chatLog"></div>
+  <div class="chips" id="chatChips"></div>
+  <form class="chat-form" id="chatForm">
+    <textarea id="chatInput" rows="1" placeholder="Ask about a date or a disbursal. Enter sends, Shift+Enter breaks a line." aria-label="Message to the agent"></textarea>
+    <button type="button" class="mic" id="chatMic" aria-pressed="false" title="Speak your question (Sarvam speech-to-text). Click to start, click again to stop." hidden>🎙</button>
+    <button type="submit" class="primary" id="chatSend">Send</button>
+  </form>
+</aside>
+
+<script type="module">
+import { extractFacts, checkReport, annotate } from "./traceability.js";
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const inr = (v) => "₹" + Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Money for display: rupee sign and paise dimmed so the magnitude reads first. Digits unchanged. */
+function money(v) {
+  const n = Number(v);
+  const s = Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const cut = s.lastIndexOf(".");
+  return `${n < 0 ? "-" : ""}<span class="rs">₹</span>${esc(s.slice(0, cut))}<span class="pa">${esc(s.slice(cut))}</span>`;
+}
+
+let config = {};
+let state = { breaks: [], active: null, conversation_id: null, report: "", steps: [], facts: null, lang: "en", translations: {}, timing: null, prefetch: null, prefetchTook: null, prefetchEvidence: [], prefetchTrace: [], live: null, t0: 0, timer: null };
+
+async function api(path, body) {
+  const res = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined);
+  const j = await res.json();
+  if (!res.ok) throw new Error(j.error || res.statusText);
+  return j;
+}
+
+// -------------------------------------------------- theme
+
+const THEME_KEY = "ledgerlens.theme";
+const systemDark = () => matchMedia("(prefers-color-scheme: dark)").matches;
+let themeDark = false;
+
+/** A null choice follows the system. localStorage throws in a private window, so guard every access. */
+function setTheme(choice) {
+  if (choice) document.documentElement.setAttribute("data-theme", choice);
+  else document.documentElement.removeAttribute("data-theme");
+  try {
+    if (choice) localStorage.setItem(THEME_KEY, choice);
+    else localStorage.removeItem(THEME_KEY);
+  } catch {}
+  themeDark = choice ? choice === "dark" : systemDark();
+  const btn = $("theme");
+  btn.textContent = themeDark ? "Light" : "Dark";
+  btn.title = `Switch to the ${themeDark ? "light" : "dark"} theme`;
+  btn.setAttribute("aria-label", btn.title);
+}
+
+setTheme(document.documentElement.getAttribute("data-theme"));
+$("theme").addEventListener("click", () => setTheme(themeDark ? "light" : "dark"));
+// Keep the button label truthful if the OS flips theme while the console is open and unpinned.
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (!document.documentElement.hasAttribute("data-theme")) setTheme(null);
+});
+
+// -------------------------------------------------- load
+
+async function init() {
+  config = await api("/api/config");
+  $("modeBadge").textContent = config.agent_mode === "mock" ? "MOCK AGENT · no LLM · template report" : `agent: ${config.agent_id} · LLM: ${config.llm}` + (config.chat_llm && config.chat_llm !== config.llm ? ` · chat: ${config.chat_llm}` : "");
+  $("modeBadge").className = "badge" + (config.agent_mode === "mock" ? " mock" : "");
+  $("modeBadge").title = $("modeBadge").textContent; // full text on hover when the badge is truncated in a narrow header
+  $("kibanaLink").href = `${config.kibana_url}/app/agent_builder`;
+  $("date").value = config.business_date;
+  $("date").addEventListener("change", () => loadDay($("date").value));
+  await loadDay(config.business_date);
+  renderChat(); // the suggested prompts need the date and the first break
+}
+
+const QUEUE_HEAD = `<thead><tr><th>Disbursal</th><th>Type</th><th>Partner</th><th class="r">Ledger</th><th class="r">Settled</th><th class="r">Delta</th><th class="r">Rows</th></tr></thead>`;
+
+function queueSkeleton() {
+  const row = `<tr><td><div class="skel w3"></div></td><td><div class="skel w2"></div></td><td><div class="skel w1"></div></td><td><div class="skel"></div></td><td><div class="skel"></div></td><td><div class="skel"></div></td><td><div class="skel w2"></div></td></tr>`;
+  $("queue").innerHTML = `<table>${QUEUE_HEAD}<tbody>${row.repeat(7)}</tbody></table>`;
+  $("queueMeta").innerHTML = `<span class="spinner"></span>matching`;
+}
+
+async function loadDay(business_date) {
+  queueSkeleton();
+  const s = await api(`/api/summary?business_date=${business_date}`);
+  state.breaks = s.breaks;
+  $("tDisb").textContent = s.disbursals.toLocaleString("en-IN");
+  $("tPartners").textContent = `${s.partners} partners`;
+  $("tValue").innerHTML = money(s.total_inr);
+  $("tBreaks").textContent = s.breaks.length;
+  $("tTook").textContent = `ES|QL match in ${s.took_ms.breaks} ms`;
+  $("queueMeta").textContent = `${s.breaks.length} of ${s.disbursals} need a look`;
+  if (!s.breaks.length) {
+    $("queue").innerHTML = '<div class="empty"><strong>Day reconciled clean</strong>Ledger, settlement file and traces agree on every disbursal for this date.</div>';
+    return;
+  }
+  const rows = s.breaks.map((b) => `
+    <tr class="row" tabindex="0" data-id="${esc(b.disbursal_id)}">
+      <td><span class="id">${esc(b.disbursal_id)}</span></td>
+      <td><span class="type ${esc(b.break_type)}">${esc(b.break_type)}</span></td>
+      <td><div class="party">${esc(b.partner)}</div><div class="rail">${esc(b.rail)}</div></td>
+      <td class="money">${money(b.ledger_inr)}</td>
+      <td class="money">${money(b.settled_inr)}</td>
+      <td class="money ${b.delta_inr === 0 ? "zero" : "neg"}">${money(b.delta_inr)}</td>
+      <td class="money">${b.settlement_rows}</td>
+    </tr>`).join("");
+  $("queue").innerHTML = `<table>${QUEUE_HEAD}<tbody>${rows}</tbody></table>`;
+  for (const tr of $("queue").querySelectorAll("tr.row")) {
+    tr.addEventListener("click", () => investigate(tr.dataset.id));
+    tr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); investigate(tr.dataset.id); } });
+  }
+}
+
+// -------------------------------------------------- investigate
+
+async function investigate(disbursal_id) {
+  clearInterval(state.timer);
+  state = { ...state, active: disbursal_id, conversation_id: null, report: "", steps: [], facts: null, lang: "en", translations: {}, timing: null, prefetch: null, prefetchTook: null, prefetchEvidence: [], prefetchTrace: [], live: null, t0: Date.now(), timer: null };
+  for (const tr of $("queue").querySelectorAll("tr.row")) tr.classList.toggle("active", tr.dataset.id === disbursal_id);
+  $("invMeta").textContent = disbursal_id;
+  mountStreaming();
+  renderStreaming([], "");
+  // The clock runs in the status bar until the report lands, so the wait reads as measured rather than frozen.
+  state.timer = setInterval(() => { const el = $("sTimer"); if (el) el.textContent = `${((Date.now() - state.t0) / 1000).toFixed(1)} s`; }, 100);
+  prefetchBreak(disbursal_id); // not awaited: the ES|QL half lands in one round trip while the model is still starting
+  const t0 = Date.now();
+  try {
+    if (config.agent_mode === "mock") await blockingInvestigate(disbursal_id, t0);
+    else await streamInvestigate(disbursal_id, t0);
+  } catch (e) {
+    try {
+      await blockingInvestigate(disbursal_id, t0);
+    } catch (e2) {
+      clearInterval(state.timer);
+      $("inv").innerHTML = `<div class="note err">Investigation failed: ${esc(e2.message)}</div>`;
+    }
+  }
+}
+
+async function blockingInvestigate(disbursal_id, t0) {
+  const r = await api("/api/investigate", { disbursal_id });
+  state.conversation_id = r.conversation_id;
+  state.steps = r.steps;
+  state.report = r.message;
+  state.facts = extractFacts(r.steps);
+  // No per-tool timings on the blocking endpoint, so only the total is known.
+  state.timing = { total: r.elapsed_ms ?? Date.now() - t0, ttft: null };
+  $("invMeta").textContent = `${disbursal_id} · ${(state.timing.total / 1000).toFixed(1)} s`;
+  render();
+}
+
+/** One SSE block -> { event, data }. Lines starting with ":" are padding comments; skip them. */
+function parseSse(block) {
+  let event = "message", data = "";
+  for (const line of block.split("\n")) {
+    if (!line || line.startsWith(":")) continue;
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) data += line.slice(5).trim();
+  }
+  if (!data) return null;
+  try {
+    const parsed = JSON.parse(data);
+    return { event, data: parsed?.data ?? parsed };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Stream one investigation. Text appears as it is written; the step list and the traceability
+ * check land on round_complete, whose payload is the same shape the blocking endpoint returns.
+ */
+async function streamInvestigate(disbursal_id, t0) {
+  const res = await fetch("/api/investigate/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ disbursal_id }) });
+  if (!res.ok || !res.body) throw new Error(`stream unavailable (${res.status})`);
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "", live = "", messageId = null, ttft = null, finished = false;
+  const liveSteps = [];
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf("\n\n")) >= 0) {
+      const evt = parseSse(buf.slice(0, i));
+      buf = buf.slice(i + 2);
+      if (!evt) continue;
+      if (evt.event === "conversation_id_set") {
+        state.conversation_id = evt.data.conversation_id ?? state.conversation_id;
+      } else if (evt.event === "reasoning") {
+        // The first reasoning event is a transient placeholder; the rest are the agent's narration.
+        if (evt.data.transient) continue;
+        liveSteps.push({ type: "reasoning", reasoning: evt.data.reasoning });
+        renderStreaming(liveSteps, live);
+      } else if (evt.event === "tool_call") {
+        liveSteps.push({ ...evt.data, type: "tool_call", started: Date.now() });
+        renderStreaming(liveSteps, live);
+      } else if (evt.event === "tool_result") {
+        const step = liveSteps.find((s) => s.tool_call_id === evt.data.tool_call_id);
+        if (step) {
+          step.results = evt.data.results ?? [];
+          step.ms = Date.now() - step.started;
+        }
+        renderStreaming(liveSteps, live);
+      } else if (evt.event === "message_chunk") {
+        // Each interim narration is its own message; show only the one being written now.
+        if (evt.data.message_id !== messageId) {
+          messageId = evt.data.message_id;
+          live = "";
+        }
+        live += evt.data.text_chunk ?? "";
+        renderStreaming(liveSteps, live);
+      } else if (evt.event === "thinking_complete") {
+        ttft = evt.data.time_to_first_token ?? null;
+      } else if (evt.event === "round_complete") {
+        const round = evt.data.round ?? {};
+        // The final steps come from the server; carry over the durations measured off the live events.
+        const timed = new Map(liveSteps.filter((s) => s.ms != null).map((s) => [s.tool_call_id, s]));
+        state.steps = (round.steps ?? []).map((s) => {
+          const t = timed.get(s.tool_call_id);
+          return t ? { ...s, started: t.started, ms: t.ms } : s;
+        });
+        state.report = round.response?.message ?? live;
+        state.facts = extractFacts(state.steps);
+        state.timing = { total: Date.now() - t0, ttft };
+        const total = (state.timing.total / 1000).toFixed(1);
+        $("invMeta").textContent = ttft ? `${disbursal_id} · first token ${(ttft / 1000).toFixed(1)}s · total ${total}s` : `${disbursal_id} · ${total} s`;
+        finished = true;
+        render();
+      } else if (evt.event === "conversation_created") {
+        // Arrives after round_complete; the approve flow and the Kibana trace link both need it.
+        state.conversation_id = evt.data.conversation_id ?? state.conversation_id;
+        if (finished) render();
+      } else {
+        console.debug("sse event", evt.event, evt.data);
+      }
+    }
+  }
+  if (!finished) throw new Error("stream ended before the report was complete");
+}
+
+/**
+ * Three of the agent's tools take only the disbursal id: break_delta, evidence_rows and trace_failure_point.
+ * They are entry conditions, not decisions, so the page runs them the moment a row is clicked (one round
+ * trip, in parallel on the server) and shows the ES|QL half of the investigation while the model is still
+ * starting. Display only: the traceability check uses the agent's own tool results, so the report still
+ * has to earn every figure itself.
+ */
+async function prefetchBreak(disbursal_id) {
+  try {
+    const r = await api(`/api/break?disbursal_id=${encodeURIComponent(disbursal_id)}`);
+    if (state.active !== disbursal_id || state.report || !r.row) return;
+    state.prefetch = r.row;
+    state.prefetchEvidence = r.evidence ?? [];
+    state.prefetchTrace = r.trace ?? [];
+    state.prefetchTook = r.took_ms ?? { break_delta: r.took };
+    // Painted once, so the fade-in runs once and no text chunk re-renders it.
+    const el = $("sPrefetch");
+    if (el) el.innerHTML = prefetchHtml();
+  } catch (e) {
+    console.debug("prefetch skipped", e.message);
+  }
+}
+
+/** ISO timestamp -> "16 Sep 14:03:22", the shape evidenceRow() uses for the agent's bullets. */
+const when = (iso) => { const m = String(iso ?? "").match(/(\d{4}-\d{2}-\d{2})T([\d:]+)/); return m ? `${m[1].slice(8)} ${MONTHS[Number(m[1].slice(5, 7)) - 1]} ${m[2]}` : ""; };
+
+function prefetchHtml() {
+  const d = state.prefetch;
+  if (!d) return "";
+  const hero = [["Ledger", d.ledger_inr, false], ["Settled", d.settled_inr, false], ["Delta", d.delta_inr, true]]
+    .map(([k, v, isDelta]) => `<div class="cell${isDelta ? " delta" : ""}${isDelta && Number(v) === 0 ? " flat" : ""}"><div class="k">${k}</div><div class="v">${money(v)}</div></div>`)
+    .join("");
+  const ms = state.prefetchTook ?? {};
+  const src = (tool, key) => `<span class="src">${tool}${ms[key] != null ? ` · ${esc(ms[key])} ms` : ""}</span>`;
+  const ev = state.prefetchEvidence ?? [];
+  const tr = state.prefetchTrace ?? [];
+  const failed = tr.filter((r) => r["event.outcome"] === "failure");
+  const evidence = ev.length
+    ? `<div class="sec"><div class="lbl">Evidence${src("ledgerlens.evidence_rows", "evidence_rows")}</div><div class="evidence"><table>
+        <thead><tr><th>Event or row</th><th>Type</th><th class="r">Amount</th><th>UTR</th><th>Time</th></tr></thead>
+        <tbody>${ev.map((r) => `<tr><td><span class="id">${esc(r.event_id ?? r.row_id ?? "")}</span></td><td class="ev">${esc(r.event_type ?? r.status ?? "")}</td><td class="money">${money(r.amount_inr)}</td><td class="id">${r.utr ? esc(r.utr) : '<span class="dim">·</span>'}</td><td class="t" title="${esc(r["@timestamp"] ?? "")}">${esc(when(r["@timestamp"]))}</td></tr>`).join("")}</tbody></table></div></div>`
+    : "";
+  const pipeline = tr.length
+    ? `<div class="sec"><div class="lbl">Pipeline${src("ledgerlens.trace_failure_point", "trace_failure_point")}</div><div class="block">${failed.length
+        ? failed.map((f) => `failure at <code>${esc(f["span.name"] ?? "")}</code> → ${esc(f["error.type"] ?? "")}: ${esc(f["error.message"] ?? "")}${f["labels.psp_status"] ? ` <span class="dim">PSP ${esc(f["labels.psp_status"])}${f["labels.psp_reason"] ? ` · ${esc(f["labels.psp_reason"])}` : ""}</span>` : ""}`).join("<br>")
+        : `All ${tr.length} spans succeeded; no pipeline failure.`}</div></div>`
+    : "";
+  const slowest = Math.max(0, ...Object.values(ms).map(Number).filter(Number.isFinite));
+  return `<div class="prefetch fade">
+    <div class="verdict">
+      <span class="vid">${esc(d.disbursal_id)}</span>
+      <span class="type ${esc(d.break_type)}">${esc(d.break_type)}</span>
+      <span class="vrule">Rule fired <code>${esc(d.rule_fired)}</code></span>
+    </div>
+    <div class="sec"><div class="lbl">Figures${src("ledgerlens.break_delta", "break_delta")}</div>
+    <div class="figures">
+      <div class="hero">${hero}</div>
+      <div class="rest">
+        <div class="line"><span class="k">Settlement rows</span><span class="v">${esc(d.settlement_rows)}</span></div>
+        <div class="line"><span class="k">Fee charged vs contracted</span><span class="v">${money(d.charged_fee_inr)} <span class="dim">vs</span> ${money(d.expected_fee_inr)}</span></div>
+        <div class="line"><span class="k">Partner / rail</span><span class="v">${esc(d.partner)} / ${esc(d.rail)}</span></div>
+      </div>
+    </div></div>
+    ${evidence}${pipeline}
+    <div class="verdict-note"><strong>ES|QL finished its half in ${esc(slowest)} ms</strong>, three tools in parallel. The verdict, ${ev.length} evidence ${ev.length === 1 ? "row" : "rows"} and ${tr.length} pipeline ${tr.length === 1 ? "span" : "spans"} were on screen before the model said a word. The agent now works out why; every figure in its report is checked against its own tool results.</div>
+  </div>`;
+}
+
+const PHASES = [["ledgerlens.break_delta", "Figures"], ["ledgerlens.evidence_rows", "Evidence"], ["ledgerlens.trace_failure_point", "Pipeline"], ["ledgerlens.similar_cases", "Precedent"]];
+let lastTraceKey = "";
+
+/**
+ * The streaming panel is mounted once per investigation and patched region by region, so a text chunk
+ * never re-renders the verdict card, the trace or the spinner (a re-render restarts their animations).
+ */
+function mountStreaming() {
+  lastTraceKey = "";
+  $("inv").innerHTML = `<div class="trust live"><span class="spinner"></span><span class="phases" id="sPhases"></span><span class="timer" id="sTimer">0.0 s</span><span class="hint" id="sHint"></span></div>
+    <div id="sTrace"></div><div id="sPrefetch">${prefetchHtml()}</div><div id="sText"></div>`;
+}
+
+/** Which tools have returned, which are running, and whether the model is writing. */
+function statusPatch(steps, text) {
+  const calls = steps.filter((s) => s.type === "tool_call");
+  const done = new Set(calls.filter((s) => s.results).map((s) => s.tool_id));
+  const running = new Set(calls.filter((s) => !s.results).map((s) => s.tool_id));
+  const writing = Boolean(text) && !running.size;
+  const chips = PHASES.map(([id, label]) => `<span class="ph${done.has(id) ? " done" : running.has(id) ? " run" : ""}">${label}</span>`).join("") + `<span class="ph${writing ? " run" : ""}">Report</span>`;
+  const hint = !calls.length && !text
+    ? "The agent is starting. It picks the tools, the cluster computes, the model only narrates."
+    : running.size ? `Running ${[...running].map((t) => t.replace("ledgerlens.", "")).join(" and ")} in the cluster.`
+    : writing ? "Writing the report. Every figure is checked against the tool results when it finishes."
+    : "Reading the tool results.";
+  const ph = $("sPhases"), hi = $("sHint");
+  if (ph && ph.innerHTML !== chips) ph.innerHTML = chips;
+  if (hi && hi.textContent !== hint) hi.textContent = hint;
+}
+
+function renderStreaming(steps, text) {
+  state.live = { steps, text };
+  if (!$("sText")) mountStreaming();
+  const key = steps.map((s, i) => `${i}${s.type}${s.tool_call_id ?? ""}${s.results ? 1 : 0}${s.ms ?? ""}`).join("|");
+  if (key !== lastTraceKey) { $("sTrace").innerHTML = traceHtml(steps, true); lastTraceKey = key; }
+  statusPatch(steps, text);
+  const calls = steps.filter((s) => s.type === "tool_call");
+  const reportStreaming = Boolean(text) && PHASES.every(([id]) => calls.some((s) => s.tool_id === id && s.results));
+  $("sPrefetch").hidden = reportStreaming;
+  $("sText").innerHTML = text ? reportHtml(esc(text), false) : "";
+}
+
+// -------------------------------------------------- agent trace
+
+/** ms under a second, otherwise seconds to one decimal. */
+const dur = (ms) => (ms == null ? "" : ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`);
+
+/**
+ * Wall time actually spent waiting on tools. Tools called in the same turn run in parallel, so their
+ * intervals are merged rather than summed. Only measurable on the streaming path.
+ */
+function toolWallMs(steps) {
+  const iv = steps.filter((s) => s.type === "tool_call" && s.started != null && s.ms != null)
+    .map((s) => [s.started, s.started + s.ms]).sort((a, b) => a[0] - b[0]);
+  if (!iv.length) return null;
+  let total = 0, [from, to] = iv[0];
+  for (const [a, b] of iv.slice(1)) {
+    if (a > to) { total += to - from; [from, to] = [a, b]; }
+    else to = Math.max(to, b);
+  }
+  return total + (to - from);
+}
+
+function traceHtml(steps, open) {
+  const calls = steps.filter((s) => s.type === "tool_call");
+  const body = steps.map((s) => {
+    if (s.type === "reasoning") return `<div class="step reasoning"><span class="n"></span><span>${esc(String(s.reasoning || "").slice(0, 220))}</span></div>`;
+    if (s.type !== "tool_call") return "";
+    const n = calls.indexOf(s) + 1;
+    const rows = (s.results || []).reduce((a, r) => a + (r?.data?.values?.length ?? (Array.isArray(r?.data) ? r.data.length : 0)), 0);
+    const p = Object.entries(s.params || {}).map(([k, v]) => `${k}=${String(v).slice(0, 56)}`).join(", ");
+    const status = s.results ? (rows === 1 ? "1 row" : `${rows} rows`) : '<span class="spinner"></span>';
+    return `<div class="step"><span class="n">${n}</span><span><code>${esc(s.tool_id)}</code> <span class="params">${esc(p)}</span></span><span class="rows">${status}</span><span class="ms">${dur(s.ms)}</span></div>`;
+  }).join("");
+  if (!body) return "";
+  const wall = toolWallMs(steps);
+  const label = `${calls.length} ES|QL tool ${calls.length === 1 ? "call" : "calls"}${wall != null ? ` in ${dur(wall)}` : ""} · the agent ordered them, the cluster computed them`;
+  return `<details class="trace"${open ? " open" : ""}><summary>Agent trace <span style="font-weight:400;text-transform:none;letter-spacing:0">${esc(label)}</span></summary><div class="steps">${body}</div></details>`;
+}
+
+/** Where the wall clock went: deterministic tool time against model time. */
+function timingHtml(steps, timing) {
+  if (!timing?.total) return "";
+  const wall = toolWallMs(steps);
+  const calls = steps.filter((s) => s.type === "tool_call").length;
+  const cells = [];
+  if (wall != null) {
+    cells.push({ cls: "esql", k: "ES|QL tools", v: dur(wall), s: `${calls} deterministic ${calls === 1 ? "query" : "queries"} in the cluster` });
+    cells.push({ cls: "model", k: "Model", v: dur(Math.max(timing.total - wall, 0)), s: "selects tools and narrates, computes nothing" });
+  }
+  if (timing.ttft) cells.push({ cls: "", k: "First token", v: dur(timing.ttft), s: "before any text appears" });
+  cells.push({ cls: "total", k: "Total", v: dur(timing.total), s: "question to signed-off report" });
+  return `<div class="timing">${cells.map((c) => `<div class="cell ${c.cls}"><div class="k">${esc(c.k)}</div><div class="v">${esc(c.v)}</div><div class="s">${esc(c.s)}</div></div>`).join("")}</div>`;
+}
+
+// -------------------------------------------------- report: parse the fixed format into blocks
+
+const inline = (s) => s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>");
+
+/**
+ * The agent's report format is fixed by elastic/agent/instructions.md: an `## id · type` heading,
+ * then one `**Label** (from tool): body` line per section, with evidence as bullets. Parse that into
+ * blocks so figures become a table and the root cause gets room to read. Input is already-escaped
+ * HTML (traceability marks included), so only line structure and the bold/backtick markers are read.
+ */
+function parseReport(html) {
+  const out = { heading: "", sections: [], closing: [] };
+  let cur = null;
+  for (const raw of html.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const h = line.match(/^#{1,3}\s+(.*)$/);
+    if (h) { out.heading = h[1]; cur = null; continue; }
+    const s = line.match(/^\*\*([^*]+?)\*\*\s*(?:\(from\s+([^)]+)\))?\s*:?\s*(.*)$/);
+    if (s) {
+      const label = s[1].replace(/:\s*$/, "").trim();
+      cur = { label, key: label.toLowerCase().replace(/[^a-z]+/g, "_"), source: s[2] || "", body: s[3] || "", items: [] };
+      out.sections.push(cur);
+      continue;
+    }
+    const b = line.match(/^[-*•]\s+(.*)$/);
+    if (b) { (cur ? cur.items : out.closing).push(b[1]); continue; }
+    if (cur && !/^Reply\b/i.test(line)) cur.body += (cur.body ? " " : "") + line;
+    else { out.closing.push(line); cur = null; }
+  }
+  return out;
+}
+
+/** Split "Ledger ₹3,26,100.00" into label and value. A label carries no digits, marks or ₹. */
+function splitLabelValue(frag) {
+  const m = frag.match(/^([^0-9₹<]*?)\s*((?:<mark|₹|-\s*₹|\d).*)$/s);
+  if (!m) return { label: frag.trim(), value: "" };
+  return { label: m[1].trim(), value: m[2].trim() };
+}
+
+const dimVs = (s) => s.replace(/\bvs\s+([a-z]+)/gi, '<span class="dim">vs $1</span>');
+const stripTags = (s) => s.replace(/<[^>]*>/g, "");
+
+function figuresHtml(sec) {
+  const parts = sec.body.split("·").map((x) => x.trim()).filter(Boolean).map(splitLabelValue);
+  if (!parts.length) return `<div class="block">${inline(sec.body)}</div>`;
+  const heroKeys = /^(ledger|settled|delta)$/i;
+  const hero = parts.filter((p) => heroKeys.test(p.label));
+  const rest = parts.filter((p) => !heroKeys.test(p.label));
+  const heroHtml = hero.length
+    ? `<div class="hero">${hero.map((p) => {
+        const isDelta = /delta/i.test(p.label);
+        const flat = isDelta && /^[^1-9]*0(\.00)?[^0-9]*$/.test(stripTags(p.value));
+        return `<div class="cell${isDelta ? " delta" : ""}${flat ? " flat" : ""}"><div class="k">${esc(p.label)}</div><div class="v">${p.value}</div></div>`;
+      }).join("")}</div>`
+    : "";
+  const restHtml = rest.length
+    ? `<div class="rest">${rest.map((p) => `<div class="line"><span class="k">${esc(p.label)}</span><span class="v">${dimVs(p.value)}</span></div>`).join("")}</div>`
+    : "";
+  return `<div class="figures">${heroHtml}${restHtml}</div>`;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** One evidence bullet -> a table row. Anything unparseable falls back to a full-width cell. */
+function evidenceRow(item) {
+  const ids = [...item.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+  const amount = item.match(/(?:<mark[^>]*>\s*)?-?\s*₹[\d,]+(?:\.\d+)?(?:\s*<\/mark>)?/);
+  const time = item.match(/(\d{4}-\d{2}-\d{2})T([\d:]+)(?:\.(\d+))?Z?/);
+  const utr = item.match(/UTR\s*`([^`]+)`/i);
+  if (!ids.length) return `<tr><td colspan="5">${inline(item)}</td></tr>`;
+  const bare = stripTags(item).replace(/`[^`]*`/g, " ").replace(/UTR/gi, " ");
+  const event = (bare.match(/\b([A-Z][A-Z0-9_]{3,})\b/) || [, ""])[1];
+  const iso = time ? time[0] : "";
+  const when = time ? `${time[1].slice(8)} ${MONTHS[Number(time[1].slice(5, 7)) - 1]} ${time[2]}` : "";
+  return `<tr>
+    <td><span class="id">${ids[0]}</span></td>
+    <td class="ev">${esc(event)}</td>
+    <td class="money">${amount ? amount[0].trim() : ""}</td>
+    <td class="id">${utr ? utr[1] : '<span class="dim">·</span>'}</td>
+    <td class="t" title="${esc(iso)}">${esc(when)}</td>
+  </tr>`;
+}
+
+function sectionHtml(sec) {
+  const head = `<div class="lbl">${esc(sec.label)}${sec.source ? `<span class="src">${esc(sec.source)}</span>` : ""}</div>`;
+  if (sec.key === "figures") return `<div class="sec">${head}${figuresHtml(sec)}</div>`;
+  if (sec.key === "evidence" && sec.items.length) {
+    return `<div class="sec">${head}<div class="evidence"><table>
+      <thead><tr><th>Event or row</th><th>Type</th><th class="r">Amount</th><th>UTR</th><th>Time</th></tr></thead>
+      <tbody>${sec.items.map(evidenceRow).join("")}</tbody></table></div></div>`;
+  }
+  if (sec.key === "root_cause") return `<div class="sec">${head}<div class="cause">${inline(sec.body)}</div></div>`;
+  if (sec.key === "recommended_action") return `<div class="sec">${head}<div class="action">${inline(sec.body)}</div></div>`;
+  if (sec.key === "draft_message") return `<div class="sec">${head}<div class="draft">${inline(sec.body)}</div></div>`;
+  if (sec.key === "confidence") {
+    const level = (stripTags(sec.body).match(/^\s*(high|medium|low)/i) || [, ""])[1];
+    const rest = level ? sec.body.replace(/^\s*(high|medium|low)[.,:]?\s*/i, "") : sec.body;
+    return `<div class="sec">${head}<div class="conf">${level ? `<span class="chip ${level.toLowerCase()}">${esc(level.toUpperCase())}</span>` : ""}<span class="rest-text">${inline(rest)}</span></div></div>`;
+  }
+  const body = sec.body + (sec.items.length ? `<ul>${sec.items.map((i) => `<li>${inline(i)}</li>`).join("")}</ul>` : "");
+  return `<div class="sec">${head}<div class="block">${inline(body)}</div></div>`;
+}
+
+function verdictHtml(p) {
+  if (!p.heading) return "";
+  const bits = p.heading.split("·").map((x) => x.trim());
+  const id = bits[0] || "";
+  const type = stripTags(bits[1] || "").trim();
+  const rule = p.sections.find((s) => s.key === "rule_fired");
+  return `<div class="verdict">
+    <span class="vid">${id}</span>
+    ${type ? `<span class="type ${esc(type)}">${esc(type)}</span>` : ""}
+    ${rule ? `<span class="vrule">Rule fired ${inline(rule.body)}</span>` : ""}
+  </div>`;
+}
+
+function reportHtml(html, fade = true) {
+  const p = parseReport(html);
+  if (!p.sections.length && !p.heading) return `<div class="report${fade ? " fade" : ""}">${markdown(html)}</div>`;
+  const order = ["figures", "evidence", "pipeline", "root_cause", "precedent", "recommended_action", "draft_message", "confidence"];
+  const rank = (s) => { const i = order.indexOf(s.key); return i < 0 ? order.length : i; };
+  const secs = p.sections.filter((s) => s.key !== "rule_fired").sort((a, b) => rank(a) - rank(b));
+  const closing = p.closing.filter((l) => l.trim()).map((l) => inline(l)).join(" ");
+  return `<div${fade ? ' class="fade"' : ""}>${verdictHtml(p)}${secs.map(sectionHtml).join("")}${closing ? `<div class="closing">${closing}</div>` : ""}</div>`;
+}
+
+// -------------------------------------------------- render
+
+function render(extraNote = "") {
+  clearInterval(state.timer);
+  const b = state.breaks.find((x) => x.disbursal_id === state.active) || {};
+  const text = state.lang === "en" ? state.report : state.translations[state.lang];
+  const check = checkReport(text, state.facts);
+  const toolCalls = state.steps.filter((s) => s.type === "tool_call");
+
+  const trust = check.total
+    ? `<div class="trust ${check.complete ? "ok" : "bad"}">
+        <span class="score">${check.traced}/${check.total}</span>
+        <span>figures and IDs traced to a tool result · ${check.amounts.length} amounts · ${check.ids.length} identifiers · <strong>${check.untraced}</strong> untraced</span>
+        <span class="tail">every figure below is highlighted where it came from</span>
+      </div>`
+    : "";
+
+  // One action per break type (elastic/workflows/actions.json, via /api/config). The button names it.
+  const breakType = b.break_type || state.prefetch?.break_type || "";
+  const action = (config.actions || []).find((a) => a.break_type === breakType) || null;
+  const approveLabel = action ? `Approve → ${action.label.toLowerCase().replace(/\bpartner\b/, b.partner || state.prefetch?.partner || "partner")}` : "Approve";
+  const hasApprovalPrompt = /approve/i.test(state.report);
+  const actions = `
+    <div class="actions">
+      ${hasApprovalPrompt && action
+        ? `<button class="primary" id="approve">${esc(approveLabel)}</button><button class="danger" id="dismiss">Dismiss</button>`
+        : `<span class="badge">no write action offered</span>`}
+      <div class="right">
+        ${config.sarvam ? ["en", "hi-IN", "kn-IN"].map((l, i) => `<button data-lang="${l}" class="lang" aria-pressed="${state.lang === l}">${["English", "हिन्दी", "ಕನ್ನಡ"][i]}</button>`).join("") : ""}
+        ${state.conversation_id && config.agent_mode === "live" ? `<a class="badge" target="_blank" rel="noopener" href="${config.kibana_url}/app/agent_builder/conversations/${encodeURIComponent(state.conversation_id)}">Trace waterfall ↗</a>` : ""}
+      </div>
+    </div>`;
+
+  $("inv").innerHTML = `
+    ${traceHtml(state.steps, true)}
+    ${timingHtml(state.steps, state.timing)}
+    ${trust}
+    ${reportHtml(annotate(text, check))}
+    ${actions}
+    <div id="note">${extraNote}</div>`;
+
+  $("approve")?.addEventListener("click", () => act("approve", b, action));
+  $("dismiss")?.addEventListener("click", () => act("dismiss", b, action));
+  for (const btn of $("inv").querySelectorAll("button.lang")) btn.addEventListener("click", () => setLang(btn.dataset.lang));
+  chatSync();
+}
+
+async function act(kind, b, action) {
+  const note = $("note");
+  const what = action ? action.label.toLowerCase() : "action";
+  note.innerHTML = `<div class="note"><span class="spinner"></span>${kind === "approve" ? `Approved. Running the ${esc(what)} workflow…` : "Dismissing…"}</div>`;
+  for (const btn of $("inv").querySelectorAll("button")) btn.disabled = true;
+  try {
+    let msg;
+    if (kind === "approve" && config.case_mode === "direct") {
+      // The server picks the workflow from the break's type and copies every figure from break_delta.
+      const r = await api("/api/act", { disbursal_id: b.disbursal_id, report: state.report, approved_by: "ops-console" });
+      msg = `${r.label}: workflow \`${r.execution_id}\` ${r.status}.` + (r.audit[0] ? ` Audit record ${r.audit[0].action}${r.audit[0].case_id ? ` · case \`${r.audit[0].case_id}\`` : ""} at ${r.audit[0]["@timestamp"]}.` : "");
+    } else {
+      const input = kind === "approve" ? "Approve. Take the recommended action now." : "Dismiss.";
+      const r = await api("/api/chat", { input, conversation_id: state.conversation_id });
+      state.steps = [...state.steps, ...r.steps];
+      msg = r.message;
+      chatRecord(input, r); // the chat drawer follows this conversation, so it shows this turn too
+    }
+    const audit = kind === "approve" ? await api(`/api/audit?disbursal_id=${b.disbursal_id}`) : [];
+    const a0 = audit[0];
+    const hasCase = a0?.case_id && a0.case_id !== "no-kibana-case";
+    const auditLine = a0
+      ? `<div class="audit">audit: ${esc(a0.action)}${hasCase ? ` · case_id ${esc(a0.case_id)}` : ""}${a0.partner ? ` · partner ${esc(a0.partner)}` : ""}${a0.utr ? ` · UTR ${esc(a0.utr)}` : ""}${a0.settlement_row_id ? ` · row ${esc(a0.settlement_row_id)}` : ""}${a0.fee_delta_inr ? ` · fee delta ${esc(a0.fee_delta_inr)}` : ""} · by ${esc(a0.approved_by)} · ${esc(a0["@timestamp"])}${hasCase ? ` <a target="_blank" rel="noopener" href="${config.kibana_url}/app/observability/cases">open Cases ↗</a>` : ""}${a0.message ? `<span class="msg">${esc(a0.message)}</span>` : ""}</div>`
+      : "";
+    render(`<div class="note ${kind === "approve" ? "ok" : ""}">${markdown(esc(msg))}${auditLine}</div>`);
+  } catch (e) {
+    render(`<div class="note err">${kind} failed: ${esc(e.message)}</div>`);
+  }
+}
+
+async function setLang(lang) {
+  if (lang !== "en" && !state.translations[lang]) {
+    $("note").innerHTML = `<div class="note"><span class="spinner"></span>Translating with Sarvam… IDs and figures are then re-checked against the tool results.</div>`;
+    try {
+      const r = await api("/api/translate", { text: state.report, target: lang });
+      state.translations[lang] = r.translated_text;
+    } catch (e) {
+      return render(`<div class="note err">Translation failed: ${esc(e.message)}</div>`);
+    }
+  }
+  state.lang = lang;
+  render();
+}
+
+// -------------------------------------------------- chat drawer: free-text turns with the same agent
+
+/**
+ * One transcript, one Agent Builder conversation. When an investigation finishes on the page, the chat
+ * adopts that conversation (chatSync), so a follow-up such as "why?" or "approve" has the report as
+ * context. `seen` remembers the last investigation adopted, so "New" is not undone by the next render.
+ * Message shapes: { role: "user", text } · { role: "agent", text, steps, live?, status?, error? } · { role: "system", text } · { role: "note", text }.
+ */
+const chat = { conversation_id: null, seen: null, messages: [], busy: false };
+
+const chatOpen = () => document.body.classList.contains("chat-open");
+
+const CHAT_KEY = "ledgerlens.chat";
+function setChatOpen(open, remember = true) {
+  document.body.classList.toggle("chat-open", open);
+  $("chatToggle").setAttribute("aria-pressed", String(open));
+  if (remember) try { localStorage.setItem(CHAT_KEY, open ? "open" : "closed"); } catch {}
+  if (open) {
+    renderChat();
+    $("chatInput").focus();
+  }
+}
+
+/** Facts for message i: every tool result in the same conversation up to and including that message. */
+function chatFactsFor(i) {
+  let from = 0;
+  for (let j = i; j >= 0; j--) if (chat.messages[j].role === "system") { from = j; break; }
+  return extractFacts(chat.messages.slice(from, i + 1).flatMap((m) => m.steps ?? []));
+}
+
+/** markdown() plus pipe tables, which the agent uses when it lists a day's breaks. Input is escaped HTML. */
+function chatMarkdown(html) {
+  const isRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+  const lines = html.split("\n");
+  let out = "", plain = [];
+  const flush = () => { if (plain.length) { out += markdown(plain.join("\n")); plain = []; } };
+  for (let i = 0; i < lines.length; i++) {
+    if (!isRow(lines[i])) { plain.push(lines[i]); continue; }
+    flush();
+    const rows = [];
+    while (i < lines.length && isRow(lines[i])) rows.push(lines[i++].trim().slice(1, -1).split("|").map((c) => c.trim()));
+    i--;
+    const cells = rows.filter((r) => !r.every((c) => /^:?-{2,}:?$/.test(c)));
+    if (!cells.length) continue;
+    const [head, ...body] = cells;
+    out += `<div class="tbl"><table><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join("")}</tr></thead><tbody>${body.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  }
+  flush();
+  return out;
+}
+
+function chatMessageHtml(m, i) {
+  if (m.role === "system" || m.role === "note") return `<div class="msg system">${esc(m.text)}</div>`;
+  if (m.role === "user") return `<div class="msg user"><div class="bubble">${esc(m.text)}</div></div>`;
+  const calls = (m.steps ?? []).filter((s) => s.type === "tool_call");
+  const tools = calls.length ? `<div class="tools">${calls.map((s) => `<code>${esc(s.tool_id)}</code>${s.results ? "" : '<span class="spinner"></span>'}`).join("")}</div>` : "";
+  if (m.error) return `<div class="msg agent"><div class="bubble err">${esc(m.text)}</div></div>`;
+  if (m.live) {
+    const body = m.text ? chatMarkdown(esc(m.text)) : `<span class="status"><span class="spinner"></span>${esc(m.status || (calls.length ? "Reading the tool results…" : "Thinking…"))}</span>`;
+    return `<div class="msg agent"><div class="bubble">${tools}${body}</div></div>`;
+  }
+  const check = checkReport(m.text, chatFactsFor(i));
+  const score = check.total ? `<span class="score ${check.complete ? "ok" : "bad"}" title="figures and IDs in this reply that appear verbatim in a tool result">${check.traced}/${check.total} traced</span>` : "";
+  const listen = config.sarvam && m.text ? `<button type="button" class="listen" data-i="${i}" title="Read this reply aloud (Sarvam text-to-speech)">Listen</button>` : "";
+  return `<div class="msg agent"><div class="bubble">${tools}${chatMarkdown(annotate(m.text, check))}</div>${score || listen ? `<div class="meta">${score}${listen}</div>` : ""}</div>`;
+}
+
+function chatSuggestions() {
+  const last = chat.messages[chat.messages.length - 1];
+  if (chat.busy || last?.live) return [];
+  if (chat.conversation_id && chat.conversation_id === state.conversation_id && state.report) {
+    return [/approve/i.test(state.report) ? "What did you rule out, and why?" : "Explain the pipeline evidence in two sentences.", "Summarise this break for the partner in two lines."];
+  }
+  const date = $("date").value || config.business_date;
+  return [
+    date ? `List the reconciliation breaks for ${date}.` : null,
+    state.breaks[0] ? `Investigate ${state.breaks[0].disbursal_id}.` : null,
+  ].filter(Boolean);
+}
+
+function renderChat() {
+  if (!chatOpen()) return;
+  const log = $("chatLog");
+  const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+  log.innerHTML = chat.messages.length
+    ? chat.messages.map(chatMessageHtml).join("")
+    : `<div class="empty"><strong>Ask the agent anything about a day or a disbursal</strong>It answers from the same ES|QL tools. Every figure and ID in a reply is checked against the tool results.</div>`;
+  if (nearBottom || chat.busy) log.scrollTop = log.scrollHeight;
+
+  const bound = chat.conversation_id && chat.conversation_id === state.conversation_id && state.active;
+  const trace = chat.conversation_id && !chat.conversation_id.startsWith("local-") && config.kibana_url && (config.chat_mode ?? config.agent_mode) === "live" ? ` · <a target="_blank" rel="noopener" href="${config.kibana_url}/app/agent_builder/conversations/${encodeURIComponent(chat.conversation_id)}">trace ↗</a>` : "";
+  $("chatCtx").innerHTML = bound ? `continuing ${esc(state.active)}${trace}` : chat.conversation_id ? `conversation continues${trace}` : "new conversation";
+
+  $("chatChips").innerHTML = chatSuggestions().map((s) => `<button type="button" data-q="${esc(s)}">${esc(s)}</button>`).join("");
+  for (const btn of $("chatChips").querySelectorAll("button")) btn.addEventListener("click", () => chatSend(btn.dataset.q));
+  $("chatSend").disabled = chat.busy;
+  $("chatMic").hidden = !config.sarvam;
+  for (const btn of log.querySelectorAll("button.listen")) btn.addEventListener("click", () => chatSpeak(chat.messages[Number(btn.dataset.i)].text, btn));
+}
+
+// -------------------------------------------------- voice (Sarvam, optional)
+
+async function chatSpeak(text, btn) {
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "…";
+  try {
+    const r = await api("/api/speak", { text });
+    await new Audio(`data:${r.mime};base64,${r.audio}`).play();
+    btn.textContent = label;
+  } catch (e) {
+    btn.textContent = "Audio failed";
+    console.debug("speak", e.message);
+  }
+  btn.disabled = false;
+}
+
+/** Click to record, click again to stop. The recording goes to Sarvam speech-to-text and the transcript is sent as the question. */
+let recorder = null;
+async function chatMicToggle() {
+  const btn = $("chatMic");
+  if (recorder) return recorder.stop();
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const chunks = [];
+    recorder = new MediaRecorder(stream);
+    recorder.ondataavailable = (e) => chunks.push(e.data);
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      const type = (recorder.mimeType || "audio/webm").split(";")[0];
+      recorder = null;
+      btn.setAttribute("aria-pressed", "false");
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": type }, body: new Blob(chunks, { type }) });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.error || res.statusText);
+        if (j.transcript) chatSend(j.transcript);
+        else $("chatInput").placeholder = "Nothing heard. Try again.";
+      } catch (e) {
+        $("chatInput").placeholder = `Transcription failed: ${e.message}`;
+      }
+      btn.disabled = false;
+    };
+    recorder.start();
+    btn.setAttribute("aria-pressed", "true");
+  } catch (e) {
+    $("chatInput").placeholder = `Microphone unavailable: ${e.message}`;
+  }
+}
+$("chatMic").addEventListener("click", chatMicToggle);
+
+/** Adopt the conversation of the investigation on screen, once per investigation. */
+function chatSync() {
+  const cid = state.conversation_id;
+  if (!cid || !state.active || !state.report || cid === chat.seen) return;
+  chat.seen = cid;
+  chat.conversation_id = cid;
+  if (chat.messages.length) chat.messages.push({ role: "system", text: `Investigation of ${state.active} opened from the queue. Follow-ups continue that conversation.` });
+  chat.messages.push({ role: "user", text: `Investigate ${state.active}.` }, { role: "agent", text: state.report, steps: state.steps });
+  renderChat();
+}
+
+/** A turn sent by the approve or dismiss button lands in the transcript too, when the chat is on that conversation. */
+function chatRecord(input, r) {
+  if (chat.conversation_id !== state.conversation_id) return;
+  chat.messages.push({ role: "user", text: input }, { role: "agent", text: r.message ?? "", steps: r.steps ?? [] });
+  renderChat();
+}
+
+async function chatSend(text) {
+  text = String(text ?? "").trim();
+  if (!text || chat.busy) return;
+  chat.busy = true;
+  const reply = { role: "agent", text: "", steps: [], live: true };
+  chat.messages.push({ role: "user", text }, reply);
+  $("chatInput").value = "";
+  $("chatInput").style.height = "";
+  renderChat();
+  const cid = chat.conversation_id;
+  // When the chat runs in our own loop but the investigation ran in Agent Builder, hand over that turn and report as context.
+  const seed = cid && cid === state.conversation_id && !cid.startsWith("local-") && state.active && state.report ? { input: `Investigate ${state.active}.`, message: state.report } : undefined;
+  try {
+    if ((config.chat_mode ?? config.agent_mode) === "mock") await chatBlocking(text, cid, reply, seed);
+    else {
+      try {
+        await chatStream(text, cid, reply, seed);
+      } catch (e) {
+        // Retry blocking only if the stream never started. A turn that reached the agent is not re-sent:
+        // "approve" must never run twice.
+        if (!e.fallback) throw e;
+        await chatBlocking(text, cid, reply, seed);
+      }
+    }
+  } catch (e) {
+    reply.error = true;
+    reply.text = `The agent did not answer: ${e.message}`;
+  }
+  reply.live = false;
+  chat.busy = false;
+  renderChat();
+  $("chatInput").focus();
+}
+
+/** Console context the server uses to rewrite a vague question into a precise one: the selected date and disbursal. */
+const chatContext = () => ({ business_date: $("date").value || config.business_date, active_disbursal: state.active || null });
+
+async function chatBlocking(input, conversation_id, reply, seed) {
+  const r = await api("/api/chat", { input, conversation_id, seed, ...chatContext() });
+  if (r.refined_input) chat.messages.splice(chat.messages.indexOf(reply), 0, { role: "note", text: `Clarified for the agent: ${r.refined_input}` });
+  chat.conversation_id = r.conversation_id ?? chat.conversation_id;
+  reply.steps = r.steps ?? [];
+  reply.text = r.message ?? "";
+}
+
+/** Same events as streamInvestigate, kept to what a transcript needs: tool calls, the text being written, the final round. */
+async function chatStream(input, conversation_id, reply, seed) {
+  const res = await fetch("/api/chat/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input, conversation_id, seed, ...chatContext() }) });
+  if (!res.ok || !res.body) throw Object.assign(new Error(`stream unavailable (${res.status})`), { fallback: true });
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "", messageId = null, finished = false;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf("\n\n")) >= 0) {
+      const evt = parseSse(buf.slice(0, i));
+      buf = buf.slice(i + 2);
+      if (!evt) continue;
+      if (evt.event === "conversation_id_set" || evt.event === "conversation_created") {
+        chat.conversation_id = evt.data.conversation_id ?? chat.conversation_id;
+      } else if (evt.event === "reasoning") {
+        if (!evt.data.transient) reply.status = String(evt.data.reasoning || "").slice(0, 160);
+      } else if (evt.event === "tool_call") {
+        reply.steps.push({ ...evt.data, type: "tool_call" });
+      } else if (evt.event === "tool_result") {
+        const step = reply.steps.find((s) => s.tool_call_id === evt.data.tool_call_id);
+        if (step) step.results = evt.data.results ?? [];
+      } else if (evt.event === "message_chunk") {
+        if (evt.data.message_id !== messageId) { messageId = evt.data.message_id; reply.text = ""; }
+        reply.text += evt.data.text_chunk ?? "";
+      } else if (evt.event === "round_complete") {
+        const round = evt.data.round ?? {};
+        reply.steps = round.steps ?? reply.steps;
+        reply.text = round.response?.message ?? reply.text;
+        finished = true;
+      } else if (evt.event === "input_refined") {
+        // The server rewrote the question before the agent saw it; show the analyst what was actually asked.
+        chat.messages.splice(chat.messages.indexOf(reply), 0, { role: "note", text: `Clarified for the agent: ${evt.data.refined}` });
+      } else if (evt.event === "error") {
+        throw new Error(evt.data?.message || evt.data?.error?.message || JSON.stringify(evt.data).slice(0, 200));
+      }
+      renderChat();
+    }
+  }
+  if (!finished) throw new Error("the stream ended before the reply was complete");
+}
+
+$("chatToggle").addEventListener("click", () => setChatOpen(!chatOpen()));
+$("chatClose").addEventListener("click", () => setChatOpen(false));
+$("chatNew").addEventListener("click", () => {
+  if (chat.busy) return;
+  chat.conversation_id = null;
+  chat.messages = [];
+  renderChat();
+  $("chatInput").focus();
+});
+$("chatForm").addEventListener("submit", (e) => { e.preventDefault(); chatSend($("chatInput").value); });
+$("chatInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); chatSend($("chatInput").value); }
+});
+$("chatInput").addEventListener("input", () => {
+  const el = $("chatInput");
+  el.style.height = "";
+  el.style.height = Math.min(el.scrollHeight, 140) + "px";
+});
+// Open on first visit where the drawer pushes the console aside instead of covering it; after that, as last left.
+{
+  let saved = null;
+  try { saved = localStorage.getItem(CHAT_KEY); } catch {}
+  if (saved === "open" || (saved !== "closed" && matchMedia("(min-width: 1081px)").matches)) setChatOpen(true, false);
+}
+
+// -------------------------------------------------- tiny markdown (fallback path and action notes)
+
+function markdown(html) {
+  const lines = html.split("\n");
+  let out = "", inList = false;
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (/^\s*[-*•]\s+/.test(line)) {
+      if (!inList) { out += "<ul>"; inList = true; }
+      out += `<li>${inline(line.replace(/^\s*[-*•]\s+/, ""))}</li>`;
+      continue;
+    }
+    if (inList) { out += "</ul>"; inList = false; }
+    if (/^#{1,3}\s/.test(line)) out += `<h2>${inline(line.replace(/^#+\s/, ""))}</h2>`;
+    else if (line.trim() === "") out += "";
+    else out += `<p>${inline(line)}</p>`;
+  }
+  if (inList) out += "</ul>";
+  return out;
+}
+
+init().catch((e) => { $("queue").innerHTML = `<div class="note err">${esc(e.message)}</div>`; });
+</script>
+</body>
+</html>

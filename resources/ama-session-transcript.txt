@@ -1,0 +1,141 @@
+Glennice COS: Hi everyone. I hope my screen is visible. KL, can you confirm?
+KL: Yes, your screen is visible now.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Glennice COS: All right. Hi everyone. Welcome to Forge the Future 2026 AMA session. Thank you so much for joining us today. I'm Glennice COS, leading programs at Hack Culture, and I'll be moderating this session. Today we'll quickly walk through the hackathon, the key dates, and what you can expect next, followed by a Q&A where you'll get your questions answered directly.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Before we get started, a quick shout-out to all the incredible partners for making Forge the Future possible. Elastic and AWS are organizing and tech partners. NASCOM AI is our industry partner, Sarvam as our AI partner, and Hack Culture as our innovation partner. Really excited to have all of them supporting this hackathon.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Now, I'm really excited to introduce our expert from Elastic, Ashish Davari, Principal Solutions Architect and Search and GenAI Specialist. Ashish, over to you.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Ashish Davari: Sure, sure. Thanks, Glennice. Um, let me share my screen, please. All right. I think it's visible. Yeah.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+All right, everyone. Thanks for joining. A very good evening. I mean, from whatever part you're joining, I know it's a weekday and it's an evening, so I'm sure you must be completing your work and finishing your days. But yeah, as a developer, your day actually starts in the evening. I do understand. So hello everyone, this is Ashish. I work as a specialist at Elastic, and I'm very, very excited for this 2026 edition of the hackathon.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+After seeing and witnessing such a good response from the 2025 hackathon, we have again decided to go and do the hackathon this year again, and we are doing it on a much larger scale compared to last year. So we've got a bit of information available today. I'm personally going to share what the schedule looks like and what topics you can pick.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+You see we have a fantastic logo available. From the partnership perspective, AWS, Sarvam, NASCOM, Hack Culture—everyone is joining us and everyone is contributing to making this hackathon successful. And they're not just contributing; they're going to help you in each and every manner while you are building something during your hackathon—for any guidance, mentorship, right?  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+So here is my ask: whatever questions you have, do not shy away from putting them into the chat. I'll take a pause in my session and I'm going to go through all those questions one by one. I'll try to answer verbally or directly, or maybe someone from my team will reach out to you with the answers. So cool, let's get started.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+I think this is what we are coming with—we have already entered into the Agentic Era, right? It started... the AI era started in the past few years, and right now we are breathing and living in AI these days. No one is writing code without help from ChatGPT, Claude, and everything.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+So the idea is whatever topic you're going to pick, it will be great if it is powered by AI. I think AI is solving very good problem statements these days. If you're building chatbots, the user experience, the ease... but these are four of the parameters that we are looking for:  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+For example, LLMs have their own knowledge. I know LLMs are getting smarter, but they are still not grounded. They have their own training datasets from which they can give answers, but it is not always true, especially if your data keeps refreshing. So what I want is for you to take an agentic approach—I mean, that's what the themes look like for this hackathon, Agentic Hackathon or something like that.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Whatever you're building, it should be grounded. It shouldn't be guessed. It should not be like you just piped some LLM and you pass some question or ask it to do some action, and it's giving responses based on whatever data it was trained on. Of course, you are free to leverage the reasoning capability of the LLMs, but not the knowledge base, right?  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+It should not be just conversational. Since we got into Agentic AI, even I personally say when I talk to customers, they just don't want chat, to be honest. I think that's solved. RAG is there; even having an agent, that's solved. But can your agent take action? That is also important, correct? So make sure if you're building something, it should be like that.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Whatever parameters I'm saying, they're not necessarily mandatory pointers, but that will make your story good whenever you go to the judgment round or when we evaluate your project. So keep this in mind.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Measurable impact, of course: how are you giving business value with this project? Maybe high conversion, right? For example, if you made some agent that actually gives good business value, that's perfect. You have to show the business value to the panel. And, of course, it will be great if you can measure those things.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Built on Elastic + AWS. That's the idea. I mean, you've got a wonderful stack available—like Elastic, whether you want to dump all your knowledge base on top of that, build vector search, semantic AI search, whatever you want to build, you can build it. You can power those reasoning or LLM capabilities by using AWS Bedrock. Now, it's not just Bedrock; if you want to host a project on EC2 or something, we are going to have AWS credits available for you, so feel free to leverage that.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Apart from both, we are also going to have Sarvam. I don't think Elastic and AWS need an introduction, but Sarvam... for specific use cases, I think it's one of my favorite stacks. So if you are building something around an Indian-native, multilingual kind of use case, I will highly encourage you to try it out with Sarvam as well.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Of course, every platform has its own duty, but there are no mandatory things you must pick, except Elastic, which is mandatory for that. Architecture-wise, Elastic is going to be the mandatory stack in your project. On top of that, of course, you can quickly pick AWS, Sarvam, come up with some ideas, and build the project around it. I hope I'm clear with that.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Yes, as we already saw, these are fantastic partners joining us: Sarvam, AWS, Hack Culture, NASCOM. We're going to have expertise from the respective fields or logos, so I really request you all to leverage that expertise while you are building and when we go into the judging round, etc. You can clear your doubts.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Cool. So I'll quickly pick some questions I can see. Dhamal is asking: "Will we be getting credits to build on AWS Bedrock and ELK?" Yes, in fact, Elastic Cloud.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Satish, I would highly encourage you to ask your question in the Q&A panel or in chat. I'll definitely answer each and every question.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Another question: "Is it mandatory to use NASCOM and Sarvam in the project?" I would say, okay, I don't want to bound you to using this specific stack. But the expectation is, since each and every platform has such good capabilities, I think you should leverage them. With a combination of the stack, you can build a good prototype or project, and it will carry good weightage whenever we evaluate it. So I would recommend, if your project really demands a use case that uses Sarvam, AWS, Elastic—use it, do not hesitate.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Because I do agree it's not possible to build a full-fledged project, but we are living in the AI era. I'm sure you can do white-box coding and give a better version than a prototype for that. You should use all three stacks; that's my ask.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+"Will we get credits for Elastic and Sarvam if selected for the next round implementation?" Yes. My team will provide an official answer on this, but from my side, my understanding is yes.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Satish is asking: "Are OpenSearch and Elastic the same?" I would say no, of course not. They are totally different products. Elastic has its own capabilities, much more performant than OpenSearch. Just type "Elasticsearch vs OpenSearch" and you will find good details on how we are different, right?  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+I'll take more questions, but I'll switch back to the slides again.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+So, the event flow—I think that's quite exciting.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+18th July to 16th August: We have already started registration. If you haven't done it yet, I would highly encourage you to please do it as soon as possible because 16th August is a hard cutoff for us. So please team up and submit your ideas in the respective tracks.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+26th to 28th August: We are going to do the virtual evaluation, and we are going to announce the Top 15. So my request is, even if you are submitting your ideas—and I'm sure you're going to take the help of AI to generate or validate them—it should not look like you just generated and submitted the idea. It should be grounded. Ultimately, this is the theme of our hackathon as well.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+So I would suggest you start putting in a strong impression from Round 1, right from registration and idea submission. It should be well-detailed and well-architected. Take the help of AI, I don't mind, but I need a human-in-the-loop interaction to make it grounded, rock-solid, and reflect your original raw idea. That's the important thing.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+September 18th & 19th: We are expecting those 15 shortlisted teams to be in Bangalore, at our Bangalore Elastic office. September 18th and 19th is a two-day hackathon. Now, does it mean you're going to get 24 hours to build it? No. You will get hours on the 18th—the team will get back to you on the exact number of hours—to build things. On the 19th, we're going to have a jury round to evaluate all your projects, and you will present to the judges.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+September 19th: We will announce the Top 3 winning teams of this hackathon.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+September 30th: Those 3 teams will present in person at Elasticon Mumbai. We have our flagship event, Elasticon Mumbai, and we definitely want to highlight those top three winners on our main stage. So I think that's a really cool opportunity, team.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+If you have not submitted or planned anything, I would highly recommend taking it seriously and submitting your idea. If you want to apply with multiple or revised ideas, that's okay, but make sure it is well-articulated and explains all the nuances.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Now, hackathon tracks overview:  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Track 1: Search and AI Platform – Focus is going to be more on chat, AI agents, search, vector search, or any problem statement you want to solve using the Search and AI platform.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Track 2: Observability – If you want to come up with monitoring and observability use cases, whether you want to monitor your scripts, agents, or anything. Observability is the right track.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Track 3: Security and AI SOC – Attack discovery, AI-based SIEM, AI SOC, creating security workflows on top of it for triage or threat hunting across different use cases.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Track 4: Industry Vertical Demo – Customer-facing and reusable tri-party code. Solving something for specific industries like BFSI, E-commerce, Public Sector, or Healthcare. Pick that specific industry and solve something for that sector.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+So go ahead, come up with good innovative ideas, pick your track, and submit it.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+I think this pretty much covers the overview. In my next few slides, I will deep dive into how Elastic—and which component of Elastic—is the right fit for each box to help you build easily.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Let's check the Q&A first.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+"Is it mandatory to use specific Elastic features like vector search or Elasticsearch?" It is mandatory to use Elastic overall. What features you pick depends on your use case, but using Elastic is mandatory. AWS, Sarvam, and other stacks will help you create an ecosystem to build your project and extend it to advanced use cases. For example, if you want to build a voice AI agent, connect with Sarvam. If you want frontier models, use Bedrock connectors. Elastic is mandatory, and I suggest taking a flavor of all these stacks.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+"Can you confirm if we will get credits for all three, and how many credits can we expect?" We will get back to you on this. Credits will definitely be provided per team, not per individual, because credits come with a cost and you have to use them wisely.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+"How much does originality matter compared to execution?" We are trying to find the right balance. If you have a very good idea but cannot execute or show it to us, that's not ideal. Try to find a balance. Your idea doesn't need to be rocket science; even if you pick a basic problem statement and solve it using this stack and demonstrate it, that's good.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Udit is asking: "Is there any template or format to follow for idea submission?" My team will answer this live in the chat for you.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+"What about the first 100 teams to submit ideas? Here you are saying 15 teams will be final." Idea submission is the first stage. From there, we will pick the Top 15 teams based on the ideas we like. That's why I request that when you submit, it shouldn't just be an idea; it should be a well-defined problem statement along with a solution and architecture so that if shortlisted, you can come and build it.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+"I had one small question: I'm still trying to understand the sweet spot between Elasticsearch and a Vector DB. At what point would you actually choose Elastic as a primary retrieval layer?"
+  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+The straightforward answer is: anywhere you want to have search, use Elastic. Elastic is a Vector DB. Elastic is full-text search, and the beauty is Elastic gives you hybrid search as well. It is one of the finest Vector DBs available in the market. For instance, Stack Overflow search is powered by Elasticsearch Vector DB. Similarly, many e-commerce and public sector users use Elastic as a Vector DB. It's a first-class citizen for GenAI use cases.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Satisha is asking: "We had some issues with offsite zero-downtime indexing. Is it okay to submit a production use case?" Absolutely! We welcome production use cases. Submit it, propose a solution for how to solve it, and we are more than happy to onboard you.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+"If my data is changing constantly, what is the best way to make sure the agent is always working with fresh information rather than stale data?"
+  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+That's with Elasticsearch. Your data can be refreshed live—in real time—and your agent will always get fresh context.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+I'll deep-dive into what capabilities Elastic holds right now:
+Elastic is a Search AI company dealing with three primary solutions: Search, AI/Observability, and Security. You can bring data from anywhere—files, Azure, Zoom, Oracle—push it into Elastic, and your data becomes AI-ready. From day zero, you can start chatting with your data without waiting. Inbuilt RAG is available with no-code UI. We have a platform called Agent Builder to build quick chat AI agents on top of your data.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Integration-wise, whatever form your data is in, push it into Elasticsearch. Content can be stored in multiple formats: dense vectors, sparse vectors, rank vectors. You can perform semantic search and full-text search on top of it. It offers a three-phase retrieval: re-ranking, similarity ranking, and rescoring in a single search API. Highlighting, sorting, and pagination are all available out of the box.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+When presenting to the jury, explain these nuances—how you are solving search using hybrid search via a single search API or data source.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Your data sits in a single JSON format containing both text descriptions and description embeddings, allowing full-text search alongside semantic search on vectors. You can combine geo-search and multiple query clauses into one single search query.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+How easy is it to build on Elastic?  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Inference Endpoints: If you're building semantic capabilities, create an inference endpoint. If using AWS Bedrock, get the API key, create the inference endpoint once, and Elastic will generate embeddings for you without needing custom code.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Out-of-the-box Models: When creating a Cloud instance, models like Jina (Jina v5, Jina CLIP) are available out of the box for multimodal, multilingual, image, or vector searches. Jina has large context windows, is cost-efficient, and supports text-to-image or image-to-image search.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Elastic serves as a single unified data source for all data types—metrics, logs, traces, threat data, malware, SIEM logs, or e-commerce SQS queues.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Once data is ingested into Elastic with vectors and analyzers, you can use Elastic Agent Builder without writing code. You can ask questions about your data, and it will identify the right index, pick relevant context, and provide grounded responses (inbuilt RAG).  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Agent Builder transforms traditional search box experiences into chat and agent windows. You can store database history, chat history, and agent memory inside Elasticsearch using vector, full-text, or hybrid search queries.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+In Kibana UI, you can create agents directly. Once tested, you can expose these agents via:  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+MCP Protocol: Kibana runs an MCP server by default, providing an MCP endpoint and credentials.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+A2A Protocol: For multi-agent systems.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Rest API: Pass the Agent ID and user question; it performs reasoning and returns JSON responses to render on your front end.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Beyond chat, to trigger actions, Elastic provides Elastic Workflows out of the box. You can pair Agent Builder (the brain) with Elastic Workflows (the hands) to execute actions based on user interactions.  
+FTF Hackathon 2026 Recording AMA Session - India.mp4
+Workflows use YAML structures defining triggers, input constants, next steps, and loops. For example, in a Trip Planner Agent, the agent finds hotels/flights from your grounded database. If the user says "make the bookings," workflows for flight, hotel, or cab bookings trigger sequentially to complete end-to-end planning

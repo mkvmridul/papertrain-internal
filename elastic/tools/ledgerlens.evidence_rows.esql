@@ -1,0 +1,14 @@
+// Tool: ledgerlens.evidence_rows
+// The raw evidence for one disbursal, in time order: every ledger event and every settlement row,
+// each with its own ID. Nothing aggregated; this is what the reviewer would pull by hand.
+// Params: ?disbursal_id (string)
+FROM ledgerlens-recon
+| WHERE disbursal_id == ?disbursal_id
+| EVAL amount_inr = amount_paise / 100.0,
+       fee_inr = fee_paise / 100.0,
+       expected_fee_inr = expected_fee_paise / 100.0
+| KEEP @timestamp, source, event_id, row_id, event_type, status, business_date, settlement_date, value_date,
+       partner, rail, utr, amount_paise, amount_inr, expected_fee_paise, expected_fee_inr, fee_paise, fee_inr,
+       loan_id, description, narration
+| SORT @timestamp ASC
+| LIMIT 50

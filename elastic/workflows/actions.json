@@ -1,0 +1,52 @@
+[
+  {
+    "tool_id": "ledgerlens.open_case",
+    "workflow_id": "ledgerlens-open-case",
+    "break_type": "MISSING_CREDIT",
+    "label": "Open case",
+    "verb": "open a case",
+    "audit_action": "CASE_OPENED",
+    "severity": "high",
+    "description": "MISSING_CREDIT action. Runs the ledgerlens-open-case Elastic Workflow: opens a high-severity Kibana case carrying the report so finance can reverse the ledger entry, and writes an audit record. ONLY call this after the user has explicitly approved in this conversation, and only for a break whose break_type is MISSING_CREDIT. Inputs: title, disbursal_id, break_type, severity (high), report (full report text), approved_by."
+  },
+  {
+    "tool_id": "ledgerlens.raise_reversal",
+    "workflow_id": "ledgerlens-raise-reversal",
+    "break_type": "DOUBLE_DEBIT",
+    "label": "Raise reversal with partner",
+    "verb": "raise the reversal request with the partner",
+    "audit_action": "REVERSAL_REQUESTED",
+    "severity": "high",
+    "description": "DOUBLE_DEBIT action. Runs the ledgerlens-raise-reversal Elastic Workflow: opens a high-severity case carrying the drafted reversal request to the partner and writes an audit record naming the duplicate UTR to reverse. ONLY call this after the user has explicitly approved in this conversation, and only for a break whose break_type is DOUBLE_DEBIT. Inputs: title, disbursal_id, break_type, partner, utr (the duplicate settlement row's UTR, verbatim), delta_inr (verbatim from break_delta), message (the Draft message text), report, approved_by."
+  },
+  {
+    "tool_id": "ledgerlens.log_fee_dispute",
+    "workflow_id": "ledgerlens-log-fee-dispute",
+    "break_type": "FEE_MISMATCH",
+    "label": "Log fee dispute",
+    "verb": "log the fee dispute against the partner",
+    "audit_action": "FEE_DISPUTE_LOGGED",
+    "severity": "low",
+    "description": "FEE_MISMATCH action. Runs the ledgerlens-log-fee-dispute Elastic Workflow: writes the overcharge to the monthly fee dispute register (an audit record with charged vs contracted fee). No case: a fee dispute is commercial, not operational. ONLY call this after the user has explicitly approved in this conversation, and only for a break whose break_type is FEE_MISMATCH. Inputs: title, disbursal_id, break_type, partner, rail, charged_fee_inr, expected_fee_inr, fee_delta_inr (all verbatim from break_delta), message (the Draft message text), report, approved_by."
+  },
+  {
+    "tool_id": "ledgerlens.close_timing",
+    "workflow_id": "ledgerlens-close-timing",
+    "break_type": "TIMING_T1",
+    "label": "Close as self-clearing",
+    "verb": "close this break as self-clearing",
+    "audit_action": "CLOSED_SELF_CLEARING",
+    "severity": "low",
+    "description": "TIMING_T1 action. Runs the ledgerlens-close-timing Elastic Workflow: closes the break as self-clearing by writing an audit record that cites the next-day settlement row and its value date. No case. ONLY call this after the user has explicitly approved in this conversation, and only for a break whose break_type is TIMING_T1. Inputs: title, disbursal_id, break_type, partner, settlement_row_id (the next-day row's row_id, verbatim from evidence_rows), value_date (verbatim), message (the Draft message text), report, approved_by."
+  },
+  {
+    "tool_id": "ledgerlens.escalate_partner",
+    "workflow_id": "ledgerlens-escalate-partner",
+    "break_type": "UNRESOLVED",
+    "label": "Escalate to partner",
+    "verb": "escalate to the partner for human review",
+    "audit_action": "ESCALATED_TO_PARTNER",
+    "severity": "medium",
+    "description": "UNRESOLVED action. Runs the ledgerlens-escalate-partner Elastic Workflow: opens a medium-severity case for human review and writes an audit record of the escalation to the partner, quoting the UTR and the unexplained delta. ONLY call this after the user has explicitly approved in this conversation, and only for a break whose break_type is UNRESOLVED. Inputs: title, disbursal_id, break_type, partner, utr (verbatim from break_delta), delta_inr (verbatim from break_delta), message (the Draft message text), report, approved_by."
+  }
+]

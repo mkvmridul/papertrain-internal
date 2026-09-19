@@ -1,0 +1,15 @@
+// Tool: ledgerlens.similar_cases
+// Hybrid retrieval over the library of past resolved breaks, in one ES|QL query:
+//   branch 1: lexical BM25 on summary        (catches exact identifiers, codes, partner names)
+//   branch 2: semantic on summary_semantic   (catches differently-worded descriptions of the same failure)
+//   FUSE merges both rankings with Reciprocal Rank Fusion.
+// Params: ?query (string) - a plain-language description of the break being investigated
+FROM ledgerlens-resolved-breaks METADATA _id, _index, _score
+| FORK ( WHERE MATCH(summary, ?query)          | SORT _score DESC | LIMIT 5 )
+       ( WHERE MATCH(summary_semantic, ?query) | SORT _score DESC | LIMIT 5 )
+| FUSE
+| SORT _score DESC
+| LIMIT 5
+| EVAL amount_inr = amount_paise / 100.0, delta_inr = delta_paise / 100.0
+| KEEP case_id, business_date, break_type, partner, rail, disbursal_id, amount_inr, delta_inr,
+       summary, root_cause, resolution, resolved_by, time_to_resolve_minutes, _score

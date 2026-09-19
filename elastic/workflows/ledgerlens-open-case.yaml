@@ -1,0 +1,86 @@
+version: "1"
+name: ledgerlens-open-case
+description: >
+  MISSING_CREDIT action. Open a high-severity case carrying the report so finance can reverse the
+  ledger entry, and write an append-only audit record. One of five actions, one per break type;
+  it runs only after a human approves in the conversation. The agent decides nothing here: every
+  field is passed through verbatim.
+enabled: true
+tags:
+  - ledgerlens
+  - bfsi
+triggers:
+  - type: manual
+inputs:
+  - name: title
+    type: string
+    required: true
+    description: Case title, e.g. "MISSING_CREDIT · DSB-20260916-00297 · Delta ₹51,500.00"
+  - name: disbursal_id
+    type: string
+    required: true
+  - name: break_type
+    type: string
+    required: true
+  - name: severity
+    type: string
+    default: high
+    description: low | medium | high | critical
+  - name: report
+    type: string
+    required: true
+    description: The full audit-ready report text produced by the agent
+  - name: approved_by
+    type: string
+    default: ops-analyst
+consts:
+  audit_index: ledgerlens-audit
+  owner: observability
+outputs:
+  case_id: "{{ steps.create_case.output.case.id | default: 'no-kibana-case' }}"
+  audit_record_id: "{{ steps.write_audit.output._id }}"
+  disbursal_id: "{{ inputs.disbursal_id }}"
+steps:
+  # 1. Kibana case. If the project type has no Cases app the step fails and we still write the audit record.
+  - name: create_case
+    type: cases.createCase
+    on-failure:
+      continue: true
+    with:
+      title: "{{ inputs.title }}"
+      description: |
+        {{ inputs.report }}
+      owner: "{{ consts.owner }}"
+      severity: "{{ inputs.severity }}"
+      tags:
+        - ledgerlens
+        - "{{ inputs.break_type }}"
+        - "{{ inputs.disbursal_id }}"
+      settings:
+        syncAlerts: false
+
+  # 2. Append-only audit record in Elasticsearch. This always runs.
+  - name: write_audit
+    type: elasticsearch.request
+    with:
+      method: POST
+      path: /{{ consts.audit_index }}/_doc?refresh=true
+      body:
+        "@timestamp": "{{ now | date: '%Y-%m-%dT%H:%M:%SZ' }}"
+        action: CASE_OPENED
+        disbursal_id: "{{ inputs.disbursal_id }}"
+        break_type: "{{ inputs.break_type }}"
+        case_id: "{{ steps.create_case.output.case.id | default: 'no-kibana-case' }}"
+        approved_by: "{{ inputs.approved_by }}"
+        execution_id: "{{ execution.id }}"
+        summary: "{{ inputs.title }}"
+
+  # 3. Tell the caller (the agent) what happened, so it can quote the IDs verbatim.
+  - name: done
+    type: console
+    with:
+      message: >
+        CASE_OPENED disbursal_id={{ inputs.disbursal_id }} break_type={{ inputs.break_type }}
+        case_id={{ steps.create_case.output.case.id | default: 'no-kibana-case' }}
+        audit_record_id={{ steps.write_audit.output._id }}
+        execution_id={{ execution.id }}

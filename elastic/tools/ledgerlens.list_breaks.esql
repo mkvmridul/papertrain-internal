@@ -1,0 +1,49 @@
+// Tool: ledgerlens.list_breaks
+// Match every DISBURSAL_SUCCEEDED ledger event for one business date against all settlement rows,
+// grouped by disbursal_id, and return only the groups that break a rule.
+// The match is a single STATS over a unified index: no join, no application code, no LLM.
+// Scalars used in comparisons (value_date, business_date) are aggregated with MAX so they are single-valued:
+// a comparison on a multivalued field is null in ES|QL and would silently fall through the CASE.
+// Params: ?business_date (string, YYYY-MM-DD)
+FROM ledgerlens-recon
+| WHERE (source == "ledger" AND event_type == "DISBURSAL_SUCCEEDED" AND business_date == ?business_date)
+     OR source == "settlement"
+| EVAL l_amt = CASE(source == "ledger", amount_paise, 0),
+       s_amt = CASE(source == "settlement", amount_paise, 0),
+       l_n   = CASE(source == "ledger", 1, 0),
+       s_n   = CASE(source == "settlement", 1, 0),
+       l_fee = CASE(source == "ledger", expected_fee_paise, 0),
+       s_fee = CASE(source == "settlement", fee_paise, 0)
+| STATS ledger_paise       = SUM(l_amt),
+        settled_paise      = SUM(s_amt),
+        ledger_rows        = SUM(l_n),
+        settlement_rows    = SUM(s_n),
+        expected_fee_paise = SUM(l_fee),
+        charged_fee_paise  = SUM(s_fee),
+        partner            = MAX(partner),
+        rail               = MAX(rail),
+        loan_id            = MAX(loan_id),
+        business_date      = MAX(business_date),
+        value_date         = MAX(value_date)
+  BY disbursal_id
+| WHERE ledger_rows > 0
+| EVAL delta_paise = ledger_paise - settled_paise,
+       fee_delta_paise = charged_fee_paise - expected_fee_paise
+| EVAL break_type = CASE(
+        settlement_rows == 0,                                                              "MISSING_CREDIT",
+        settlement_rows > 1,                                                               "DOUBLE_DEBIT",
+        delta_paise == 0 AND fee_delta_paise != 0,                                         "FEE_MISMATCH",
+        delta_paise == 0 AND fee_delta_paise == 0 AND value_date > business_date,          "TIMING_T1",
+        delta_paise == 0 AND fee_delta_paise == 0 AND value_date == business_date,         "MATCHED",
+                                                                                           "UNRESOLVED")
+| WHERE break_type != "MATCHED"
+| EVAL ledger_inr = ledger_paise / 100.0,
+       settled_inr = settled_paise / 100.0,
+       delta_inr = delta_paise / 100.0,
+       fee_delta_inr = fee_delta_paise / 100.0
+| KEEP disbursal_id, break_type, partner, rail, loan_id, business_date, value_date,
+       ledger_paise, settled_paise, delta_paise, settlement_rows,
+       expected_fee_paise, charged_fee_paise, fee_delta_paise,
+       ledger_inr, settled_inr, delta_inr, fee_delta_inr
+| SORT break_type ASC, disbursal_id ASC
+| LIMIT 200

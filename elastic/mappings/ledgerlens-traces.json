@@ -1,0 +1,41 @@
+{
+  "mappings": {
+    "dynamic": "strict",
+    "_meta": {
+      "purpose": "Disbursal-pipeline spans, shaped like Elastic APM / ECS so the same ES|QL works against real APM data (traces-apm-*) in production. In this build they are indexed directly from the generator.",
+      "correlation_key": "labels.disbursal_id joins a trace to its ledger events and settlement rows."
+    },
+    "properties": {
+      "@timestamp":  { "type": "date" },
+      "duration_ms": { "type": "long" },
+      "trace":   { "properties": { "id": { "type": "keyword" } } },
+      "span":    { "properties": { "id": { "type": "keyword" }, "name": { "type": "keyword" }, "type": { "type": "keyword" } } },
+      "parent":  { "properties": { "id": { "type": "keyword" } } },
+      "service": { "properties": { "name": { "type": "keyword" } } },
+      "event":   { "properties": { "outcome": { "type": "keyword" } } },
+      "http": {
+        "properties": {
+          "request":  { "properties": { "method": { "type": "keyword" } } },
+          "response": { "properties": { "status_code": { "type": "integer" } } }
+        }
+      },
+      "error": { "properties": { "type": { "type": "keyword" }, "message": { "type": "text" } } },
+      "labels": {
+        "properties": {
+          "disbursal_id":            { "type": "keyword" },
+          "partner":                 { "type": "keyword" },
+          "rail":                    { "type": "keyword" },
+          "business_date":           { "type": "keyword" },
+          "psp_status":              { "type": "keyword" },
+          "psp_reason":              { "type": "keyword" },
+          "retry_attempt":           { "type": "integer" },
+          "idempotency_key_present": { "type": "boolean" },
+          "utr":                     { "type": "keyword" },
+          "callback_for_attempt":    { "type": "integer" },
+          "settlement_cycle":        { "type": "keyword" },
+          "booked_on":               { "type": "keyword" }
+        }
+      }
+    }
+  }
+}
