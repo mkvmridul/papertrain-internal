@@ -1,5 +1,5 @@
-// Builds presentation/LedgerLens.pptx. Eleven slides: title, problem, business impact, the idea, architecture,
-// the five break types, demo, measured numbers, platform map, honesty, close. Every number on a slide is sourced
+// Builds presentation/LedgerLens.pptx. Fourteen slides: title, the analyst's day (business impact, no technology), what one day costs, against the market,
+// the idea, architecture, the platform end to end (diagram), the five break types, demo, the chat layer, measured numbers, platform map, honesty, close. Every number on a slide is sourced
 // in that slide's speaker notes to BENCHMARKS.md, data/answer-key.json or CHANGELOG.md.
 // 16:9, 10in x 5.625in. Safe fonts only (Cambria titles, Calibri body, Courier New for identifiers).
 // Run: node presentation/build-deck.js   (needs pptxgenjs: npm install --no-save pptxgenjs)
@@ -72,43 +72,51 @@ const tile = (slide, x, y, w, h, big, label, src, dark = false) => {
   s.addNotes("Open: Three systems must agree about money: the ledger, the bank's settlement file, and the pipeline that pushed the funds. When they disagree, an analyst spends thirty to sixty minutes per break, by hand. That is my own estimate from running this in production, not a benchmark. Say the line once, slowly.\n\nThe card on the right is a real seeded break from the demo day (data/answer-key.json): DSB-20260916-00114, NORTHBANK, RTGS, ledger 304280000 paise = ₹30,42,800.00, settled 0, failure at psp.callback then psp.status-poll, CALLBACK_TIMEOUT, beneficiary account invalid.");
 }
 
-// ================================================================ 2. problem (white)
+// ================================================================ 2. the analyst's day: business impact, no technology (white)
 {
   const s = pres.addSlide();
   s.background = { color: C.white };
-  title(s, "Three systems must agree about every rupee");
+  const NAME = "Arjun";
+  // Avatar: one emoji in a circle (renders through the system emoji font; no image file needed).
+  s.addShape(pres.shapes.OVAL, { x: 0.5, y: 0.3, w: 0.95, h: 0.95, fill: { color: C.bg }, line: { color: C.line, width: 1 } });
+  text(s, "👨‍💼", { x: 0.5, y: 0.3, w: 0.95, h: 0.95, fontSize: 36, align: "center", valign: "middle" });
+  title(s, `Meet ${NAME}. He makes the money agree.`, { x: 1.65, w: 7.85 });
+  text(s, `Reconciliation analyst at a lender. Every evening the bank's settlement file lands, and every rupee paid out that day has to match it. Tonight, ten do not.`, { x: 1.65, y: 0.9, w: 7.85, h: 0.45, fontSize: 11, color: C.muted });
+
   const cols = [
-    ["Event-sourced ledger", "DISBURSAL_INITIATED → SUCCEEDED or FAILED, amount, expected fee, UTR. The internal truth."],
-    ["Partner settlement file", "PSP or bank rows: UTR, amount, fee charged, value date. The bank's truth."],
-    ["Disbursal pipeline traces", "psp.transfer → psp.callback → psp.status-poll, with errors and retries. What actually happened."],
+    [`${NAME}'s evening today`, C.coral, C.coralTint, [
+      "6 pm. The bank's settlement file lands. Ten of today's disbursals do not match.",
+      "For each one: pull the ledger entries, open the bank file, read the payment logs, find a similar past case, write the root cause, decide the action. 30 to 60 minutes.",
+      "Ten breaks are 5 to 10 hours. The queue does not clear on a heavy day. The write-up is one tired human at 11 pm.",
+      "Meanwhile the disputed money sits unreconciled, refunds wait, and every unexplained rupee is audit exposure.",
+    ]],
+    [`${NAME}'s evening with LedgerLens`, C.green, C.greenTint, [
+      "6 pm. He opens the queue. The ten breaks are already flagged, each with its amount and the rule it broke.",
+      "He clicks one. Under a minute later: what happened, why, the evidence, where the payment failed, a past case resolved the same way, and the action with its message drafted.",
+      "Every figure in the report is highlighted as checked against the source records. He reads and approves. The case is opened and the audit record written, naming him.",
+      "When nothing in the records explains a break, the report says so, lists what it ruled out, and escalates. It never guesses.",
+    ]],
   ];
-  cols.forEach(([h, d], i) => {
-    const x = 0.5 + i * 3.1;
-    box(s, x, 1.2, 2.8, 1.2, { fill: { color: C.bg } });
-    text(s, h, { x: x + 0.15, y: 1.3, w: 2.5, h: 0.3, fontSize: 13.5, bold: true, color: C.navy });
-    text(s, d, { x: x + 0.15, y: 1.62, w: 2.5, h: 0.72, fontSize: 10.5, color: C.muted });
+  cols.forEach(([h, color, fill, items], i) => {
+    const x = 0.5 + i * 4.6;
+    box(s, x, 1.4, 4.4, 2.3, { fill: { color: fill }, line: { color, width: 1 } });
+    text(s, h, { x: x + 0.15, y: 1.5, w: 4.1, h: 0.3, fontSize: 13, bold: true, color });
+    bullets(s, items, { x: x + 0.15, y: 1.85, w: 4.1, h: 1.8, fontSize: 9.5 });
   });
-  chip(s, "BREAK", 3.05, 2.55, 0.9, { fill: C.coralTint, border: C.coral, color: C.coral, fontSize: 10 });
-  chip(s, "BREAK", 6.15, 2.55, 0.9, { fill: C.coralTint, border: C.coral, color: C.coral, fontSize: 10 });
-  text(s, "A reconciliation break is two or more of them disagreeing about the same disbursal.", { x: 0.5, y: 2.55, w: 2.5, h: 0.6, fontSize: 10, color: C.muted, italic: true });
 
-  text(s, "What breaks look like", { x: 0.5, y: 3.2, w: 4.3, h: 0.3, fontSize: 14, bold: true, color: C.navy });
-  bullets(s, [
-    "Missing credit: booked as success, nothing settled. Funds never moved",
-    "Double debit: one disbursal, two UTRs, the partner executed a retry twice",
-    "Fee mismatch: principal matches, the fee does not follow the rate card",
-    "Late credit: initiated after cut-off, settled on the next value date",
-    "Unexplained shortfall: one row, a small delta, nothing in the data explains it",
-  ], { x: 0.5, y: 3.52, w: 4.3, h: 1.6, fontSize: 11 });
-
-  text(s, "Today", { x: 5.2, y: 3.2, w: 4.3, h: 0.3, fontSize: 14, bold: true, color: C.coral });
-  bullets(s, [
-    "An analyst pulls entries from three systems by hand and writes the root cause",
-    "30 to 60 minutes per break (my own estimate from production, not a benchmark)",
-    "The queue does not clear on high-volume days; the write-up is one tired human at 11 pm",
-    "Settlement cash sits in the nodal account, refunds wait, every unexplained figure is audit exposure",
-  ], { x: 5.2, y: 3.52, w: 4.3, h: 1.6, fontSize: 11 });
-  s.addNotes("Every lender, PSP and bank runs this reconciliation daily. The break types on the left are exactly the five the system detects and acts on (DATA.md, seeded break catalogue). The manual time is my own estimate from operating this class of system in production; it is labelled as such everywhere.");
+  const tiles = [
+    ["~10×", "more breaks closed per analyst-day. 30 to 60 minutes a break becomes about 3 to 5, including reading and approving (estimate)", true],
+    ["< 1 min", "from click to a fully investigated report. 20 to 45 s in the runs we measured; the clock runs on screen every time", false],
+    ["0 guesses", "every figure in the write-up is checked against the source records; every action is approved by a human and audited", false],
+  ];
+  tiles.forEach(([big, label, dark], i) => {
+    const x = 0.5 + i * 3.075, y = 3.85, w = 2.85, h = 1.2;
+    box(s, x, y, w, h, dark ? { fill: { color: C.navy2 }, line: { color: C.navy2, width: 0 } } : { fill: { color: C.bg } });
+    text(s, big, { x: x + 0.15, y: y + 0.08, w: w - 0.3, h: 0.5, fontFace: F.title, fontSize: 24, bold: true, color: dark ? C.greenBright : C.green });
+    text(s, label, { x: x + 0.15, y: y + 0.6, w: w - 0.3, h: h - 0.68, fontSize: 9, color: dark ? C.white : C.ink });
+  });
+  footer(s, `${NAME} is a composite persona. The manual time is the builder's own estimate from operating this class of system in production, not a benchmark. The agent time is measured live on every run.`);
+  s.addNotes(`Talk track, about 30 seconds, no technology names on purpose; the stack comes after the demo. "Meet ${NAME}. Every evening the bank's file lands and every rupee has to match. Ten don't. Today each one is 30 to 60 minutes of pulling entries from three places and writing a root cause by hand; ten breaks is his whole evening. With LedgerLens the ten are flagged before he clicks, each report lands in under a minute with the evidence and a drafted action, and he reads and approves. About ten times the breaks closed per analyst-day, and nothing in the write-up is a guess." Then go to the console.\n\nSources. Manual 30 to 60 minutes per break: the builder's own estimate from production, not a benchmark (SUBMISSION.md, Business baseline); it is labelled as such in the footer. Agent wall clock: 20 to 45 s in measured runs (28 to 45 s through Agent Builder with the Elastic Managed LLM, within 19 s in local mode; CHANGELOG.md 18 Sep, SUBMISSION.md Where the time goes); the console header shows the clock on every run. The ~10x is derived, not measured: 30 to 60 min becomes about 3 to 5 min (under a minute of agent time plus reading and approving, which we have not timed), so 30/3 = 10 to 60/5 = 12. Say "about ten times" and say it is derived from the estimate. Ten breaks on the demo day: data/answer-key.json, BENCHMARKS.md section 1. "0 guesses": the traceability check marks every figure green or red on every report (src/console/traceability.js) and the UNRESOLVED break is escalated with what was ruled out, never explained away (DEMO.md). If asked who ${NAME} is: a composite of the analysts who run this reconciliation where I work; not a real person.`);
 }
 
 // ================================================================ 3. business impact (white)
@@ -138,6 +146,37 @@ const tile = (slide, x, y, w, h, big, label, src, dark = false) => {
   ], { x: 5.2, y: 3.77, w: 4.3, h: 1.35, fontSize: 10 });
   footer(s, "Synthetic data by design (DATA.md). The manual baseline is the builder's estimate, not a benchmark. The agent time is shown live in the console header on every run.");
   s.addNotes("Business impact, sourced. Demo-day totals: 388 successful disbursals worth ₹24,71,32,300 (BENCHMARKS.md section 7). Principal in dispute = missing-credit deltas 431740000 paise (₹43,17,400) + double-debit excess 53340000 paise (₹5,33,400) + unresolved shortfall 100000 paise (₹1,000) = 485180000 paise = ₹48,51,800. Late credits = the two TIMING_T1 principals 196160000 + 40110000 = 236270000 paise = ₹23,62,700. Fee overcharge = 295 + 90 paise = ₹3.85. Time: 10 breaks × 30 to 60 min = 5 to 10 hours; 10 × 45 s = 7.5 min. Observed investigation wall clock: 28 to 45 s through Agent Builder with the Elastic Managed LLM, within 19 s in local mode (CHANGELOG.md); ES|QL per investigation is the sum of medians in BENCHMARKS.md, under 0.2 s.");
+}
+
+// ================================================================ 3b. against the market: cheaper and more useful (white)
+{
+  const s = pres.addSlide();
+  s.background = { color: C.white };
+  title(s, "Against what the market runs today", { w: 6.2 });
+  text(s, "Comparison by category, no vendor named. Every LedgerLens cell is measured or labelled as an estimate; sources in the notes.", { x: 6.4, y: 0.45, w: 3.1, h: 0.55, fontSize: 9, color: C.muted, align: "right" });
+  const rows = [
+    ["", "Analyst by hand", "Rules-based recon suite", "Chat or RAG assistant", "LedgerLens"],
+    ["Finds the break", "Hours after the file lands", "Yes: matched or unmatched", "Only if you ask it", "Yes: one query over the whole day, 30 ms"],
+    ["Explains why", "If the analyst digs through three systems", "No: the exception goes to a human", "Plausible prose; the figures may be wrong", "Root cause from ledger, file and trace; every figure from a query"],
+    ["Figures a reviewer can sign", "Yes, slowly", "For matches; nothing for exceptions", "No: a model's number is an opinion", "Yes: every figure checked back to its source, N / N on every report"],
+    ["Finds a precedent", "Memory and mailbox search", "No", "Sometimes", "Yes: same-type precedent at rank 1 for 5 of 5 break types"],
+    ["Takes the action, audited", "By hand, unlogged", "A ticket at best", "No", "Yes: five gated actions, a human approves, audit record and case"],
+    ["Time per break", "30 to 60 min (estimate)", "Seconds to match; the exception still costs the analyst", "Minutes, then re-verify by hand", "Under 1 min to a report; then read and approve"],
+    ["What you pay for", "Analyst hours, linear in breaks", "Licence and implementation per system", "Model tokens on every question", "Model time only on the exceptions; pay-per-use Elastic and Bedrock"],
+  ];
+  s.addTable(
+    rows.map((r, i) => r.map((c, j) => ({ text: c, options: { bold: i === 0 || j === 0 || (j === 4 && i > 0), fontFace: F.body, color: i === 0 ? C.white : j === 4 ? C.green : j === 0 ? C.navy : C.ink, fill: { color: i === 0 ? C.navy : j === 4 ? C.greenTint : i % 2 ? C.white : C.bg }, fontSize: i === 0 ? 9.5 : 8.5, valign: "middle", margin: [3, 5, 3, 5] } }))),
+    { x: 0.5, y: 1.05, w: 9, colW: [1.45, 1.75, 1.9, 1.85, 2.05], border: { type: "solid", color: C.line, pt: 0.5 }, rowH: [0.3, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4] },
+  );
+
+  box(s, 0.5, 4.42, 4.4, 0.7, { fill: { color: C.navy }, line: { color: C.navy, width: 0 } });
+  text(s, "Cheaper", { x: 0.65, y: 4.47, w: 1.0, h: 0.6, fontFace: F.title, fontSize: 14, bold: true, color: C.greenBright, valign: "middle" });
+  text(s, "One query matches the whole day; the model is spent only on the ten exceptions, about ₹10 of model time per break (estimate). Pay-per-use Elastic Cloud Serverless and Bedrock: no licence, no servers.", { x: 1.65, y: 4.45, w: 3.15, h: 0.64, fontSize: 8.5, color: C.white, valign: "middle" });
+  box(s, 5.1, 4.42, 4.4, 0.7, { fill: { color: C.greenTint }, line: { color: C.green, width: 1 } });
+  text(s, "More useful", { x: 5.25, y: 4.47, w: 1.15, h: 0.6, fontFace: F.title, fontSize: 14, bold: true, color: C.green, valign: "middle" });
+  text(s, "A report a compliance reviewer signs in seconds; the action taken and audited in the same flow; an honest escalation when nothing explains the break; the report in Hindi or Kannada for the ops floor.", { x: 6.4, y: 4.45, w: 3.0, h: 0.64, fontSize: 8.5, color: C.ink, valign: "middle" });
+  footer(s, "Manual time is the builder's estimate, not a benchmark. LedgerLens figures: BENCHMARKS.md, CHANGELOG.md, OPTIMIZATION.md. Model cost is an estimate from one measured run at list price.");
+  s.addNotes("Why this slide: judges score Impact (Problem Solving 10, Market Potential 10) and want to know whether this is cheaper or more effective than what a bank runs today. The comparison is by category, not by vendor; if pressed, say we compare against the categories we have operated with, not a named product.\n\nLedgerLens cells, sourced: one query, 30 ms median to match the day (BENCHMARKS.md section 7). Every figure from a query and checked back to its source: src/console/traceability.js, N / N shown on every report. Precedent at rank 1 for 5 of 5 break types (BENCHMARKS.md section 6). Five gated actions writing audit records and cases (elastic/workflows). Under 1 minute to a report: 20 to 45 s measured (CHANGELOG.md 18 Sep, OPTIMIZATION.md timeline).\n\nModel cost estimate, so you can defend it: one measured investigation used 69,163 input tokens across 4 model calls, of which 46,288 were served from the prompt cache, plus roughly 2,500 output tokens including the ~1,800-token report (OPTIMIZATION.md, Elastic Managed LLM run). At the list price of a Sonnet-class model (about $3 per million input, $15 per million output, cache reads at a tenth of input): 22,875 x 3 + 46,288 x 0.3 + 2,500 x 15 = about 0.12 dollars, about ₹10. Bedrock publishes its own price list, same order of magnitude. Say: 'about ten rupees of model time per break, from one measured run at list price'. The point is structural: the model is never spent on the disbursals that matched.\n\n'No licence, no servers': Elastic Cloud Serverless and Bedrock are metered; the console is a Node service with zero npm dependencies. The other columns are capability statements about categories, kept deliberately generic.");
 }
 
 // ================================================================ 4. the idea (white)
@@ -199,6 +238,76 @@ const tile = (slide, x, y, w, h, big, label, src, dark = false) => {
   text(s, "Every figure the agent reports originates in an ES|QL result and is passed through verbatim. The LLM receives rows and emits prose. The console checks this live: each amount and ID in the report is matched back to the tool result it came from.", { x: 0.7, y: 3.9, w: 8.6, h: 0.7, fontSize: 11, color: C.white, valign: "middle" });
   text(s, "Search, in one sentence: identifiers are keyword and matched exactly; human descriptions are text plus semantic_text embedded by Elastic's inference service; precedent retrieval FORKs a BM25 branch and a semantic branch and FUSEs them with reciprocal rank fusion, in one ES|QL query, one search API.", { x: 0.5, y: 4.7, w: 9, h: 0.5, fontSize: 10, color: C.muted, italic: true });
   s.addNotes("Walk left to right, one sentence each. Land on hybrid search: precedent retrieval is one ES|QL query, a BM25 branch and a semantic branch fused with RRF. Exact IDs and fuzzy human descriptions in one search API. Elastic embeds at index and query time through the project's default inference endpoint (.jina-embeddings-v5-text-small); there is no embedding code in the repo. Mappings: elastic/mappings/*.json, dynamic strict. Tools: elastic/tools/*.esql. Agent: src/setup-agent.js creates everything through the Kibana API and smoke-tests a tool with no LLM. Model: the project's Elastic Managed LLM, or Amazon Bedrock (anthropic.claude-sonnet-4-5, us-west-2) through the ledgerlens-bedrock inference endpoint; the switch is one environment variable.");
+}
+
+// ================================================================ 5b. the platform end to end: diagram (white)
+{
+  const s = pres.addSlide();
+  s.background = { color: C.white };
+  title(s, "One platform, end to end", { w: 4.5 });
+  text(s, "Elastic Cloud Serverless · ES|QL · Agent Builder · Elastic Workflows · Kibana Cases · Amazon Bedrock · Sarvam", { x: 5.0, y: 0.45, w: 4.5, h: 0.55, fontSize: 9.5, color: C.muted, align: "right" });
+
+  // style: core = the path a break takes; plain = supporting; gate = human approval; new = added notification tool; next = planned integration (dashed)
+  const ST = {
+    core: { fill: C.greenTint, line: { color: C.green, width: 1 }, label: C.navy, sub: C.ink },
+    plain: { fill: C.white, line: { color: C.line, width: 1 }, label: C.navy, sub: C.ink },
+    gate: { fill: C.amberTint, line: { color: C.amber, width: 1 }, label: C.amber, sub: C.ink },
+    new: { fill: C.navy2, line: { color: C.navy2, width: 0 }, label: C.greenBright, sub: C.white },
+    next: { fill: C.white, line: { color: C.muted, width: 1, dashType: "dash" }, label: C.muted, sub: C.muted },
+  };
+  const lanes = [
+    ["Sources", [
+      ["Ledger events", "DISBURSAL_INITIATED · SUCCEEDED · FAILED", "core"],
+      ["Partner settlement files", "PAYSTREAM · NORTHBANK · MERIDIAN", "core"],
+      ["Payment pipeline traces", "APM / ECS shape", "core"],
+      ["S3 → Lambda file ingest", "normalise each partner's file", "next"],
+      ["Elastic APM agents", "traces-apm-* straight from the pipeline", "next"],
+    ]],
+    ["Elasticsearch", [
+      ["ledgerlens-recon", "ledger + settlement, one schema, strict mapping", "core"],
+      ["ledgerlens-traces", "pipeline spans", "core"],
+      ["ledgerlens-resolved-breaks", "semantic_text via the inference endpoint", "core"],
+      ["ledgerlens-audit", "append-only record of every action", "core"],
+      ["Data streams by business date", "for volume", "next"],
+    ]],
+    ["ES|QL tools", [
+      ["list_breaks", "STATS BY disbursal_id, no join", "core"],
+      ["break_delta", "figures + rule table R0 to R5", "core"],
+      ["evidence_rows", "every row with its own ID", "core"],
+      ["trace_failure_point", "failed span, error, retry", "core"],
+      ["similar_cases", "FORK BM25 + semantic, FUSE RRF", "core"],
+    ]],
+    ["Agent Builder", [
+      ["Agent ledgerlens", "10 tools; orders them, narrates, never computes; a trace per conversation", "core"],
+      ["LLM: Amazon Bedrock", "through an Elasticsearch inference endpoint, or the Elastic Managed LLM", "plain"],
+      ["Human approval gate", "nothing runs until the reviewer types approve", "gate"],
+      ["Bedrock Guardrails", "under the institution's AWS account", "next"],
+    ]],
+    ["Actions and surfaces", [
+      ["5 Elastic Workflows", "one per break type → Kibana Cases + audit", "core"],
+      ["Email notification", "isolated, deterministic workflow tool; sends the approved message", "new"],
+      ["Ops console", "queue · verdict · stream · traceability · approve · Sarvam voice", "plain"],
+      ["Kibana Alerting", "on break-volume spikes", "next"],
+      ["Slack / Teams connector", "the same message to the ops channel", "next"],
+      ["Kibana dashboards", "break trends per partner and rail", "next"],
+    ]],
+  ];
+  const W = 1.62, GAP = 0.225, TOP = 1.4, BOTTOM = 4.95, VGAP = 0.07;
+  lanes.forEach(([name, items], li) => {
+    const x = 0.5 + li * (W + GAP);
+    text(s, name, { x, y: 1.05, w: W, h: 0.28, fontSize: 10.5, bold: true, color: C.navy });
+    s.addShape(pres.shapes.LINE, { x, y: 1.34, w: W, h: 0, line: { color: C.navy, width: 1 } });
+    const h = (BOTTOM - TOP - (items.length - 1) * VGAP) / items.length;
+    items.forEach(([label, sub, st], i) => {
+      const y = TOP + i * (h + VGAP), k = ST[st];
+      box(s, x, y, W, h, { fill: { color: k.fill }, line: k.line });
+      text(s, label, { x: x + 0.08, y: y + 0.05, w: W - 0.16, h: 0.22, fontSize: 8.5, bold: true, color: k.label });
+      text(s, sub, { x: x + 0.08, y: y + 0.27, w: W - 0.16, h: h - 0.3, fontSize: 7.5, color: k.sub });
+    });
+    if (li < lanes.length - 1) arrow(s, x + W + 0.02, (TOP + BOTTOM) / 2, x + W + GAP - 0.02);
+  });
+  footer(s, "Every figure the agent reports originates in an ES|QL result and is passed through verbatim; every write happens in a workflow, after a human approves, and leaves an audit record.");
+  s.addNotes("Walk left to right, one sentence per lane: the three sources land in Elasticsearch under strict mappings; five ES|QL tools compute every figure; the Agent Builder agent orders those tools and narrates, with Bedrock as the model; after a human approves, an Elastic Workflow acts and writes the audit record; the console and Kibana are where people see it.\n\nThe email notification (dark box): a separate Elastic Workflow registered as an Agent Builder tool. Deterministic and isolated: it passes the approved draft message through and computes nothing, it cannot run the investigation tools, and like the other five it runs only after approval. NOTE TO PRESENTER: this workflow's YAML is not in this repository snapshot (elastic/workflows has the five break-type workflows); confirm it is registered in the cloud project before claiming it on stage.\n\nDashed boxes are the next integrations, not built: S3 → Lambda file ingest, Elastic APM agents feeding traces-apm-*, data streams by business date, Bedrock Guardrails, Kibana Alerting, Slack / Teams connector, Kibana dashboards. If a judge asks about one, say 'that is next; the ES|QL is already ECS-shaped so the trace tool runs unchanged against traces-apm-*' and move on. Do not claim any of them runs today. Everything else on the slide is in elastic/ and src/ and runs against the cloud project (BENCHMARKS.md, CHANGELOG.md).");
 }
 
 // ================================================================ 6. the five break types (white)
